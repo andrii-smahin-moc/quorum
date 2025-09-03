@@ -36,6 +36,8 @@ export function validateConfig(environment: Record<string, unknown>): Validation
         successfullyVerifiesMemberNumberAndPin: validationResult.output.GOAL_SUCCESSFULLY_VERIFIES_MEMBER_NUMBER_AND_PIN,
         enterAPin: validationResult.output.GOAL_ENTER_A_PIN,
         invalidMemberNumber: validationResult.output.GOAL_INVALID_MEMBER_NUMBER,
+        forgotPin: validationResult.output.GOAL_FORGOT_PIN,
+        invalidPin: validationResult.output.GOAL_INVALID_PIN,
       },
       requestTimeout: Number(validationResult.output.REQUEST_TIMEOUT) || 5000,
       retryDelay: Number(validationResult.output.RETRY_DELAY) || 3000,

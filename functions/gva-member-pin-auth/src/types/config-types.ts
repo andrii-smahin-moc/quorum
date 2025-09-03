@@ -24,6 +24,8 @@ export interface GVAGoals {
   successfullyVerifiesMemberNumberAndPin: string;
   enterAPin: string;
   invalidMemberNumber: string;
+  invalidPin: string;
+  forgotPin: string;
 }
 
 export interface FunctionConfig {

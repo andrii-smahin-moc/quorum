@@ -17,4 +17,6 @@ export const BaseEnvironmentSchema = v.object({
   GOAL_SUCCESSFULLY_VERIFIES_MEMBER_NUMBER_AND_PIN: v.string(),
   GOAL_ENTER_A_PIN: v.string(),
   GOAL_INVALID_MEMBER_NUMBER: v.string(),
+  GOAL_FORGOT_PIN: v.string(),
+  GOAL_INVALID_PIN: v.string(),
 });

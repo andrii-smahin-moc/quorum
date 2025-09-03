@@ -1,4 +1,4 @@
-import { INITIAL_STEP, MEMBER_NUMBER_REGEX, MEMBER_PIN_REGEX } from '../constants';
+import { FORGET_THE_PIN, INITIAL_STEP, MEMBER_NUMBER_REGEX, MEMBER_PIN_REGEX } from '../constants';
 import { FunctionConfig, HandlerPayload, HandlerResult, LoggerInterface } from '../types';
 
 import { BaseGVAGoalService } from './base-gva-goal-service';
@@ -66,12 +66,21 @@ export class GVAGoalService extends BaseGVAGoalService {
           responseId: this.config.gvaGoals.successfullyVerifiesMemberNumberAndPin,
         });
       }
+
+      if (FORGET_THE_PIN.test(userInput.toLowerCase())) {
+        await this.logger.info(`EngagementId: ${context.engagementId}, User forgot PIN`);
+        return this.buildHandlerResultPayload({
+          customJourneyContext: { STEP: null },
+          isFinalStep: true,
+          responseId: this.config.gvaGoals.forgotPin,
+        });
+      }
     }
 
     await this.logger.info(`EngagementId: ${context.engagementId}, Invalid PIN`);
     return this.buildHandlerResultPayload({
       customJourneyContext: { STEP: GVAGoalSteps.VALIDATE_PIN },
-      responseId: this.config.gvaGoals.enterAPin,
+      responseId: this.config.gvaGoals.invalidPin,
     });
   }
 }
