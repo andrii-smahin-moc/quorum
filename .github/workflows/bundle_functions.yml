@@ -1,0 +1,17 @@
+name: Bundle functions on release publish
+on:
+  release:
+    types: [published]
+
+jobs:
+  call-workflow-build-artifacts:
+    permissions:
+      contents: write
+    uses: FDMS-Glia/pipelines/.github/workflows/bundle_functions.yml@main
+    with:
+      owner: FDMS-Glia
+      repo: ${{ github.event.repository.name }}
+      tag: ${{ github.event.release.tag_name }}
+      release_id: ${{ github.event.release.id }}
+    secrets:
+      gh_token: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,24 @@
+{
+  "name": "hello-world",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "esbuild --bundle --format=esm --outfile=function-out.js --target=es2020 src/index.js",
+    "dev": "wrangler dev",
+    "format": "prettier --write --log-level=warn '**/*.js' && eslint --cache --fix .",
+    "test": "vitest run",
+    "lint": "eslint --cache . && prettier --check '**/*.js'"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.8.61",
+    "esbuild": "^0.25.0",
+    "eslint": "^8.57.0",
+    "eslint-config-standard": "^17.1.0",
+    "eslint-plugin-import": "^2.29.1",
+    "eslint-plugin-n": "^16.6.2",
+    "eslint-plugin-promise": "^6.1.1",
+    "prettier": "^3.2.5",
+    "vitest": "3.2.4",
+    "wrangler": "^4.28.1"
+  }
+}
