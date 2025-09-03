@@ -18,9 +18,12 @@ export interface GliaConfig {
 }
 
 export interface GVAGoals {
-  askNumberGoalId: string;
-  validNumberGoalId: string;
-  reAskNumberGoalId: string;
+  needToAuthentication: string;
+  transferToLiveOperator: string;
+  alreadyAuthenticated: string;
+  successfullyVerifiesMemberNumberAndPin: string;
+  enterAPin: string;
+  invalidMemberNumber: string;
 }
 
 export interface FunctionConfig {

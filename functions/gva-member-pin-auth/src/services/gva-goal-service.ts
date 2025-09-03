@@ -1,10 +1,11 @@
+import { INITIAL_STEP, MEMBER_NUMBER_REGEX, MEMBER_PIN_REGEX } from '../constants';
 import { FunctionConfig, HandlerPayload, HandlerResult, LoggerInterface } from '../types';
 
 import { BaseGVAGoalService } from './base-gva-goal-service';
 
 export enum GVAGoalSteps {
-  ASK_NUMBER = 'ask_number',
-  VALIDATE_NUMBER = 'validate_number',
+  VALIDATE_MEMBER_NUMBER = 'VALIDATE_MEMBER_NUMBER',
+  VALIDATE_PIN = 'VALIDATE_PIN',
 }
 
 export class GVAGoalService extends BaseGVAGoalService {
@@ -13,41 +14,64 @@ export class GVAGoalService extends BaseGVAGoalService {
     private logger: LoggerInterface,
   ) {
     super();
-    this.register('default', this.handleAskNumberStep.bind(this));
-    this.register(GVAGoalSteps.ASK_NUMBER, this.handleAskNumberStep.bind(this));
-    this.register(GVAGoalSteps.VALIDATE_NUMBER, this.handleValidateNumberStep.bind(this));
+    this.register(INITIAL_STEP, this.initialStep.bind(this));
+    this.register(GVAGoalSteps.VALIDATE_MEMBER_NUMBER, this.validateMemberNumber.bind(this));
+    this.register(GVAGoalSteps.VALIDATE_PIN, this.validatePin.bind(this));
   }
 
-  async handleAskNumberStep(context: HandlerPayload): Promise<HandlerResult> {
-    await this.logger.info(`EngagementId: ${context.engagementId}, Asking user for a number`);
+  async initialStep(context: HandlerPayload): Promise<HandlerResult> {
+    // add check is need to authenticate ot not
+    await this.logger.info(`EngagementId: ${context.engagementId}, Starting initial step`);
     return this.buildHandlerResultPayload({
-      customJourneyContext: { STEP: GVAGoalSteps.VALIDATE_NUMBER },
-      responseId: this.config.gvaGoals.askNumberGoalId,
+      customJourneyContext: { STEP: GVAGoalSteps.VALIDATE_MEMBER_NUMBER },
+      responseId: this.config.gvaGoals.needToAuthentication,
     });
   }
 
-  async handleValidateNumberStep(context: HandlerPayload): Promise<HandlerResult> {
-    await this.logger.info(`EngagementId: ${context.engagementId}, Validating number input from user`);
+  async validateMemberNumber(context: HandlerPayload): Promise<HandlerResult> {
+    await this.logger.info(`EngagementId: ${context.engagementId}, Validating member number`);
 
     if (context.messageType === 'text' && context.text) {
-      const numberRegex = /^\d+$/;
-      const enteredText = context.text.trim();
-
-      if (numberRegex.test(enteredText)) {
-        await this.logger.info(`EngagementId: ${context.engagementId}, Valid number received: ${enteredText}`);
+      const userInput = context.text.trim();
+      if (MEMBER_NUMBER_REGEX.test(userInput)) {
+        await this.logger.info(`EngagementId: ${context.engagementId}, Valid member number received: ${userInput}`);
+        // save member number to KV store
+        // send OTP to visitor
         return this.buildHandlerResultPayload({
-          customJourneyContext: { STEP: null },
-          isFinalStep: true,
-          responseData: { number: enteredText },
-          responseId: this.config.gvaGoals.validNumberGoalId,
+          customJourneyContext: { STEP: GVAGoalSteps.VALIDATE_PIN },
+          responseId: this.config.gvaGoals.enterAPin,
         });
       }
     }
 
-    await this.logger.info(`EngagementId: ${context.engagementId}, Invalid input received, re-asking for number`);
+    await this.logger.info(`EngagementId: ${context.engagementId}, Invalid member number`);
     return this.buildHandlerResultPayload({
-      customJourneyContext: { STEP: GVAGoalSteps.VALIDATE_NUMBER },
-      responseId: this.config.gvaGoals.reAskNumberGoalId,
+      customJourneyContext: { STEP: GVAGoalSteps.VALIDATE_MEMBER_NUMBER },
+      responseId: this.config.gvaGoals.invalidMemberNumber,
+    });
+  }
+
+  async validatePin(context: HandlerPayload): Promise<HandlerResult> {
+    await this.logger.info(`EngagementId: ${context.engagementId}, Validating PIN`);
+
+    if (context.messageType === 'text' && context.text) {
+      const userInput = context.text.trim();
+      if (MEMBER_PIN_REGEX.test(userInput)) {
+        await this.logger.info(`EngagementId: ${context.engagementId}, Valid PIN received: ${userInput}`);
+        // get MEMBER NUMBER from KV store
+        // validate PIN and MEMBER NUMBER
+        return this.buildHandlerResultPayload({
+          customJourneyContext: { STEP: null },
+          isFinalStep: true,
+          responseId: this.config.gvaGoals.successfullyVerifiesMemberNumberAndPin,
+        });
+      }
+    }
+
+    await this.logger.info(`EngagementId: ${context.engagementId}, Invalid PIN`);
+    return this.buildHandlerResultPayload({
+      customJourneyContext: { STEP: GVAGoalSteps.VALIDATE_PIN },
+      responseId: this.config.gvaGoals.enterAPin,
     });
   }
 }

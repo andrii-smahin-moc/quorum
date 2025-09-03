@@ -1,4 +1,5 @@
 import { CatalogErrors } from './catalog-errors';
+import { INITIAL_STEP } from './constants';
 import { GVAGoalService } from './services';
 import { BaseRequestPayload, FunctionConfig, LoggerInterface, ServiceResponse } from './types';
 
@@ -30,7 +31,7 @@ export class RequestHandler {
       }
     }
 
-    const step = typeof customJourneyContext.STEP === 'string' ? customJourneyContext.STEP : 'default';
+    const step = typeof customJourneyContext.STEP === 'string' ? customJourneyContext.STEP : INITIAL_STEP;
 
     try {
       const stepHandler = this.gvaGoalService.resolve(step);
