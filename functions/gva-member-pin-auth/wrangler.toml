@@ -1,7 +1,7 @@
-name = "hello-world"
-main = "src/function.js"
-compatibility_date = "2024-03-14"
+name = "gva-member-pin-auth-function"
+main = "worker-wrapper.ts"
 compatibility_flags = ["nodejs_compat"]
+compatibility_date = "2024-09-23"
 
 # Variable bindings. These are arbitrary, plaintext strings (similar to environment variables)
 # Note: Use secrets to store sensitive data.

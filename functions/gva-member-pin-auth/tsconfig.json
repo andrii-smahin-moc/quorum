@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "moduleResolution": "node",
+    "target": "esnext",
+    "baseUrl": "./src",
+    "strict": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "lib": ["esnext"]
+  },
+  "exclude": ["node_modules"],
+  "include": ["tsup.config.ts", "worker-wrapper.ts", "src/**/*.ts", "tests/**/*.ts"]
+}

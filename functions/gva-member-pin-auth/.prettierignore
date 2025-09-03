@@ -1,0 +1,4 @@
+node_modules
+package*.json
+wrangler.toml
+worker-configuration.d.d.ts

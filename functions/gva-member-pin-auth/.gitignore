@@ -171,5 +171,7 @@ dist
 .dev.vars
 .wrangler/
 
-# bundled function
 function-out.js
+scripts
+
+.DS_Store
