@@ -5,13 +5,13 @@ import simpleImportSort from 'eslint-plugin-simple-import-sort';
 import perfectionist from 'eslint-plugin-perfectionist';
 import unicorn from 'eslint-plugin-unicorn';
 
-import customRules from './.eslintrc-rules/custom-rules.mjs';
-import { orderedImportsEslint } from './.eslintrc-rules/ordered-imports.eslint.mjs';
-import { perfectionistEslint } from './.eslintrc-rules/perfectionist.eslint.mjs';
-import { securityEslint } from './.eslintrc-rules/security.eslint.mjs';
-import { namingConventionEslint } from './.eslintrc-rules/naming-convention.eslint.mjs';
-import { typescriptRecommendedEslint } from './.eslintrc-rules/typescript-recommended.eslint.mjs';
-import { unicornEslint } from './.eslintrc-rules/unicorn.eslint.mjs';
+import customRules from '../../.eslint/function/custom-rules.mjs';
+import { orderedImportsEslint } from '../../.eslint/function/ordered-imports.eslint.mjs';
+import { perfectionistEslint } from '../../.eslint/function//perfectionist.eslint.mjs';
+import { securityEslint } from '../../.eslint/function/security.eslint.mjs';
+import { namingConventionEslint } from '../../.eslint/function/naming-convention.eslint.mjs';
+import { typescriptRecommendedEslint } from '../../.eslint/function//typescript-recommended.eslint.mjs';
+import { unicornEslint } from '../../.eslint/function/unicorn.eslint.mjs';
 
 export default [
   {

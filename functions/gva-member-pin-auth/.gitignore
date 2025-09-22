@@ -175,3 +175,6 @@ function-out.js
 scripts
 
 .DS_Store
+
+glia-ai-sdk.json
+gva-member-pin-auth

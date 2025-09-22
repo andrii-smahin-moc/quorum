@@ -28,10 +28,19 @@ export interface GVAGoals {
   forgotPin: string;
 }
 
+export interface GliaAIConfig {
+  detectOptionPrompt: string;
+  detectConfidence: number;
+  temperature: number;
+  maxTokens: number;
+  stopSequences: string[];
+}
+
 export interface FunctionConfig {
   callRetries: number;
   dataDog: DataDogConfig;
   glia: GliaConfig;
+  gliaAI: GliaAIConfig;
   gvaGoals: GVAGoals;
   requestTimeout: number;
   retryDelay: number;

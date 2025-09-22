@@ -29,15 +29,31 @@ export function validateConfig(environment: Record<string, unknown>): Validation
         userApiKey: validationResult.output.GLIA_USER_API_KEY,
         userApiKeySecret: validationResult.output.GLIA_USER_API_KEY_SECRET,
       },
+      gliaAI: {
+        detectConfidence: Number(validationResult.output.PROMPT_DETECT_CONFIDENCE),
+        detectOptionPrompt: validationResult.output.PROMPT_OPTION_DETECTOR,
+        maxTokens: Number(validationResult.output.GLIA_AI_MAX_TOKENS),
+        stopSequences: (() => {
+          const raw = validationResult.output.GLIA_AI_STOP_SEQUENCES;
+          if (!raw) {
+            return [];
+          }
+          return raw
+            .split(',')
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0);
+        })(),
+        temperature: Number(validationResult.output.GLIA_AI_TEMPERATURE),
+      },
       gvaGoals: {
-        needToAuthentication: validationResult.output.GOAL_NEED_TO_AUTHENTICATION,
-        transferToLiveOperator: validationResult.output.GOAL_TRANSFER_TO_LIVE_OPERATOR,
         alreadyAuthenticated: validationResult.output.GOAL_ALREADY_AUTHENTICATED,
-        successfullyVerifiesMemberNumberAndPin: validationResult.output.GOAL_SUCCESSFULLY_VERIFIES_MEMBER_NUMBER_AND_PIN,
         enterAPin: validationResult.output.GOAL_ENTER_A_PIN,
-        invalidMemberNumber: validationResult.output.GOAL_INVALID_MEMBER_NUMBER,
         forgotPin: validationResult.output.GOAL_FORGOT_PIN,
+        invalidMemberNumber: validationResult.output.GOAL_INVALID_MEMBER_NUMBER,
         invalidPin: validationResult.output.GOAL_INVALID_PIN,
+        needToAuthentication: validationResult.output.GOAL_NEED_TO_AUTHENTICATION,
+        successfullyVerifiesMemberNumberAndPin: validationResult.output.GOAL_SUCCESSFULLY_VERIFIES_MEMBER_NUMBER_AND_PIN,
+        transferToLiveOperator: validationResult.output.GOAL_TRANSFER_TO_LIVE_OPERATOR,
       },
       requestTimeout: Number(validationResult.output.REQUEST_TIMEOUT) || 5000,
       retryDelay: Number(validationResult.output.RETRY_DELAY) || 3000,

@@ -1,0 +1,6 @@
+{
+  "GLIA_AI_FUNCTION_URL": "path to deployed function",
+  "GLIA_AI_API_KEY": "user api key",
+  "GLIA_AI_API_KEY_SECRET": "user api key secret",
+  "GLIA_AI_DOMAIN": "glia api domain"
+}

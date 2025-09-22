@@ -3,12 +3,15 @@
   "compilerOptions": {
     "moduleResolution": "node",
     "target": "esnext",
-    "baseUrl": "./src",
+    "baseUrl": ".",
     "strict": true,
     "noEmit": true,
     "resolveJsonModule": true,
     "esModuleInterop": true,
-    "lib": ["esnext"]
+    "lib": ["esnext"],
+    "paths": {
+      "ai": ["./glia-ai-sdk.ts"]
+    }
   },
   "exclude": ["node_modules"],
   "include": ["tsup.config.ts", "worker-wrapper.ts", "src/**/*.ts", "tests/**/*.ts"]
