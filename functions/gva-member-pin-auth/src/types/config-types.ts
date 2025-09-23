@@ -26,6 +26,7 @@ export interface GVAGoals {
   invalidMemberNumber: string;
   invalidPin: string;
   forgotPin: string;
+  zeroPress: string;
 }
 
 export interface GliaAIConfig {
@@ -44,4 +45,5 @@ export interface FunctionConfig {
   gvaGoals: GVAGoals;
   requestTimeout: number;
   retryDelay: number;
+  inputValidationFailedAttemptsLimit: number;
 }

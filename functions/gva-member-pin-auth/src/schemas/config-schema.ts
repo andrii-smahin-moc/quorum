@@ -3,6 +3,7 @@ import * as v from 'valibot';
 export const BaseEnvironmentSchema = v.object({
   CALL_RETRIES: v.optional(v.string()),
   DD_API_KEY: v.string(),
+  FAIL_ATTEMPTS: v.optional(v.string()),
   FDMS_VERSION: v.string(),
   GLIA_AI_MAX_TOKENS: v.string(),
   GLIA_AI_STOP_SEQUENCES: v.string(),
@@ -18,6 +19,7 @@ export const BaseEnvironmentSchema = v.object({
   GOAL_NEED_TO_AUTHENTICATION: v.string(),
   GOAL_SUCCESSFULLY_VERIFIES_MEMBER_NUMBER_AND_PIN: v.string(),
   GOAL_TRANSFER_TO_LIVE_OPERATOR: v.string(),
+  GOAL_ZERO_PRESS: v.string(),
   IS_DEV_MOD: v.optional(v.string()),
   PROMPT_DETECT_CONFIDENCE: v.string(),
   PROMPT_OPTION_DETECTOR: v.string(),

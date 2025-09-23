@@ -14,6 +14,7 @@ export const AnswerOptionsList = {
   // CANCEL: 'cancel',
   // CONFIRM: 'confirm',
   MEMBER_NUMBER: 'member_number',
+  ZERO_NUMBER: 'zero_number',
 };
 
 export class GVAGoalService extends BaseGVAGoalService {
@@ -31,6 +32,7 @@ export class GVAGoalService extends BaseGVAGoalService {
       // new AnswerOption(AnswerOptionsList.CANCEL, ['To Cancel', 'cancel', 'stop', 'abort']),
       // new AnswerOption(AnswerOptionsList.CONFIRM, ['To continue', 'Confirm', 'yes', 'ok']),
       new AnswerOption(AnswerOptionsList.MEMBER_NUMBER, [MEMBER_NUMBER_REGEX]),
+      new AnswerOption(AnswerOptionsList.ZERO_NUMBER, [/^0+$/, 'zero']),
     ]);
   }
 
@@ -46,7 +48,11 @@ export class GVAGoalService extends BaseGVAGoalService {
   async validateMemberNumber(context: HandlerPayload): Promise<HandlerResult> {
     await this.logger.info(`EngagementId: ${context.engagementId}, Validating member number`);
 
-    const detectedAnswer = await this.answerDetectorService.detect(context);
+    const detectedAnswer = this.answerDetectorService.detect(context);
+
+    const customJourneyContext = this.getCustomJurneyContext(context);
+
+    let failedAttempts = Number(customJourneyContext.failedAttempts ?? 0);
 
     if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.MEMBER_NUMBER) {
       await this.logger.info(`EngagementId: ${context.engagementId}, Valid member number received: ${detectedAnswer.matchedText}`);
@@ -58,9 +64,26 @@ export class GVAGoalService extends BaseGVAGoalService {
       });
     }
 
+    if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.ZERO_NUMBER) {
+      await this.logger.info(`EngagementId: ${context.engagementId}, Zero press detected`);
+      return this.buildHandlerResultPayload({
+        isFinalStep: true,
+        responseId: this.config.gvaGoals.zeroPress,
+      });
+    }
+    failedAttempts += 1;
+
+    if (failedAttempts >= this.config.inputValidationFailedAttemptsLimit) {
+      await this.logger.info(`EngagementId: ${context.engagementId}, Too many failed attempts`);
+      return this.buildHandlerResultPayload({
+        isFinalStep: true,
+        responseId: this.config.gvaGoals.transferToLiveOperator,
+      });
+    }
+
     await this.logger.info(`EngagementId: ${context.engagementId}, Invalid member number`);
     return this.buildHandlerResultPayload({
-      customJourneyContext: { STEP: GVAGoalSteps.VALIDATE_MEMBER_NUMBER },
+      customJourneyContext: { failedAttempts, STEP: GVAGoalSteps.VALIDATE_MEMBER_NUMBER },
       responseId: this.config.gvaGoals.invalidMemberNumber,
     });
   }
@@ -96,5 +119,16 @@ export class GVAGoalService extends BaseGVAGoalService {
       customJourneyContext: { STEP: GVAGoalSteps.VALIDATE_PIN },
       responseId: this.config.gvaGoals.invalidPin,
     });
+  }
+
+  private getCustomJurneyContext(context: HandlerPayload) {
+    let customJourneyContext: Record<string, unknown> = {};
+    if (context.customJourneyContext) {
+      const parseResult = this.safeJSONParse(context.customJourneyContext);
+      if (parseResult.status) {
+        customJourneyContext = parseResult.output;
+      }
+    }
+    return customJourneyContext;
   }
 }

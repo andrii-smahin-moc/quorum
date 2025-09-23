@@ -13,16 +13,16 @@ export class AnswerDetectorService {
     this.gliaAiService = new GliaAIService(this.config);
   }
 
-  async detect(context: HandlerPayload): Promise<AnswerOption | null> {
+  detect(context: HandlerPayload): AnswerOption | null {
     const local = this.possibleAnswers.find((r) => (r.match(context).isMatched ? r : null));
     if (local) {
       return local;
     }
 
-    if (context.text) {
-      await this.logger.info(`No local match found, invoking AI detection`);
-      return this.detectWithAI(context.text);
-    }
+    // if (context.text) {
+    //   await this.logger.info(`No local match found, invoking AI detection`);
+    //   return this.detectWithAI(context.text);
+    // }
 
     return null;
   }
