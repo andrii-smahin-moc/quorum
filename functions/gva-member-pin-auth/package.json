@@ -12,7 +12,8 @@
     "lint": "eslint --cache ./src && prettier --check '**/*.ts'",
     "generate-types": "wrangler types",
     "typecheck": "npx tsc --noEmit",
-    "postinstall": "cd ../.. && npm install --no-audit --no-fund || true"
+    "postinstall": "cd ../.. && npm install --no-audit --no-fund || true",
+    "replay": "tsx scripts/replay.ts --payload fixtures/payload.json --env .dev.vars"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.8.56",
@@ -21,6 +22,7 @@
     "globals": "^16.4.0",
     "prettier": "^3.5.3",
     "tsup": "^8.4.0",
+    "tsx": "^4.20.5",
     "type-fest": "^5.0.0",
     "typescript": "^5.8.3",
     "vite": "^6.3.5",

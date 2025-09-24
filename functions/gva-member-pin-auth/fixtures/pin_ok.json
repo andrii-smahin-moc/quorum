@@ -1,0 +1,7 @@
+{
+  "engagementId": "eng-005",
+  "gvaId": "gva-005",
+  "messageType": "text",
+  "text": "1234",
+  "customJourneyContext": "{\"STEP\":\"VALIDATE_PIN\"}"
+}
