@@ -1,7 +1,0 @@
-{
-  "engagementId": "eng-003",
-  "gvaId": "gva-003",
-  "messageType": "text",
-  "text": "0",
-  "customJourneyContext": "{\"STEP\":\"VALIDATE_MEMBER_NUMBER\"}"
-}

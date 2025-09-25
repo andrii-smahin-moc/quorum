@@ -1,7 +1,0 @@
-{
-  "engagementId": "eng-004",
-  "gvaId": "gva-004",
-  "messageType": "text",
-  "text": "abc-not-a-number",
-  "customJourneyContext": "{\"STEP\":\"VALIDATE_MEMBER_NUMBER\",\"failedAttempts\":2}"
-}
