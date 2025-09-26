@@ -38,6 +38,11 @@ export interface GliaAIConfig {
   stopSequences: string[];
 }
 
+export interface QuorumConfig {
+  quorumApiDomain: string;
+  quorumApiHeader: string;
+}
+
 export interface FunctionConfig {
   callRetries: number;
   dataDog: DataDogConfig;
@@ -47,4 +52,6 @@ export interface FunctionConfig {
   requestTimeout: number;
   retryDelay: number;
   inputValidationFailedAttemptsLimit: number;
+  quorumConfig: QuorumConfig;
+  quaorumApiDomain: string;
 }

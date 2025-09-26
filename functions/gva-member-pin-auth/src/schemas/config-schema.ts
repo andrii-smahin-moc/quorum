@@ -24,6 +24,8 @@ export const BaseEnvironmentSchema = v.object({
   IS_DEV_MOD: v.optional(v.string()),
   PROMPT_DETECT_CONFIDENCE: v.string(),
   PROMPT_OPTION_DETECTOR: v.string(),
+  QUORUM_API_DOMAIN: v.string(),
+  QUORUM_API_HEADER: v.string(),
   REQUEST_TIMEOUT: v.optional(v.string()),
   RETRY_DELAY: v.optional(v.string()),
   SITE_ID: v.string(),

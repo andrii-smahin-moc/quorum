@@ -57,7 +57,14 @@ export function validateConfig(environment: Record<string, unknown>): Validation
         transferToLiveOperator: validationResult.output.GOAL_TRANSFER_TO_LIVE_OPERATOR,
         zeroPress: validationResult.output.GOAL_ZERO_PRESS,
       },
+
       inputValidationFailedAttemptsLimit: Number(validationResult.output.FAIL_ATTEMPTS) || 3,
+
+      quorumConfig: {
+        quorumApiDomain: validationResult.output.QUORUM_API_DOMAIN,
+        quorumApiHeader: validationResult.output.QUORUM_API_HEADER,
+      },
+
       requestTimeout: Number(validationResult.output.REQUEST_TIMEOUT) || 5000,
       retryDelay: Number(validationResult.output.RETRY_DELAY) || 3000,
     },
