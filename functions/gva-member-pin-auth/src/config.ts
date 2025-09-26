@@ -52,6 +52,7 @@ export function validateConfig(environment: Record<string, unknown>): Validation
         invalidMemberNumber: validationResult.output.GOAL_INVALID_MEMBER_NUMBER,
         invalidPin: validationResult.output.GOAL_INVALID_PIN,
         needToAuthentication: validationResult.output.GOAL_NEED_TO_AUTHENTICATION,
+        pinattemptsexceeded: validationResult.output.GOAL_PIN_ATTEMPTS_EXCEEDED,
         successfullyVerifiesMemberNumberAndPin: validationResult.output.GOAL_SUCCESSFULLY_VERIFIES_MEMBER_NUMBER_AND_PIN,
         transferToLiveOperator: validationResult.output.GOAL_TRANSFER_TO_LIVE_OPERATOR,
         zeroPress: validationResult.output.GOAL_ZERO_PRESS,

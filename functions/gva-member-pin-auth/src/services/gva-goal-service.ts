@@ -11,8 +11,6 @@ export enum GVAGoalSteps {
 }
 
 export const AnswerOptionsList = {
-  // CANCEL: 'cancel',
-  // CONFIRM: 'confirm',
   MEMBER_NUMBER: 'member_number',
   ZERO_NUMBER: 'zero_number',
 };
@@ -39,8 +37,12 @@ export class GVAGoalService extends BaseGVAGoalService {
   async initialStep(context: HandlerPayload): Promise<HandlerResult> {
     // add check is need to authenticate ot not
     await this.logger.info(`EngagementId: ${context.engagementId}, Starting initial step`);
+    const customJourneyContext = this.getCustomJurneyContext(context);
+    customJourneyContext.STEP = GVAGoalSteps.VALIDATE_MEMBER_NUMBER;
+
     return this.buildHandlerResultPayload({
-      customJourneyContext: { STEP: GVAGoalSteps.VALIDATE_MEMBER_NUMBER },
+      // <<< прокинутий існуючий контекст + новий STEP
+      customJourneyContext,
       responseId: this.config.gvaGoals.needToAuthentication,
     });
   }
@@ -49,7 +51,6 @@ export class GVAGoalService extends BaseGVAGoalService {
     await this.logger.info(`EngagementId: ${context.engagementId}, Validating member number`);
 
     const detectedAnswer = this.answerDetectorService.detect(context);
-
     const customJourneyContext = this.getCustomJurneyContext(context);
 
     let failedAttempts = Number(customJourneyContext.failedAttempts ?? 0);
@@ -58,8 +59,10 @@ export class GVAGoalService extends BaseGVAGoalService {
       await this.logger.info(`EngagementId: ${context.engagementId}, Valid member number received: ${detectedAnswer.matchedText}`);
       // save member number to KV store
       // send OTP to visitor
+      customJourneyContext.failedAttempts = 0; // reset attempts on success
+      customJourneyContext.STEP = GVAGoalSteps.VALIDATE_PIN;
       return this.buildHandlerResultPayload({
-        customJourneyContext: { STEP: GVAGoalSteps.VALIDATE_PIN },
+        customJourneyContext,
         responseId: this.config.gvaGoals.enterAPin,
       });
     }
@@ -71,7 +74,9 @@ export class GVAGoalService extends BaseGVAGoalService {
         responseId: this.config.gvaGoals.zeroPress,
       });
     }
+
     failedAttempts += 1;
+    customJourneyContext.failedAttempts = failedAttempts;
 
     if (failedAttempts >= this.config.inputValidationFailedAttemptsLimit) {
       await this.logger.info(`EngagementId: ${context.engagementId}, Too many failed attempts`);
@@ -82,8 +87,10 @@ export class GVAGoalService extends BaseGVAGoalService {
     }
 
     await this.logger.info(`EngagementId: ${context.engagementId}, Invalid member number`);
+    customJourneyContext.STEP = GVAGoalSteps.VALIDATE_MEMBER_NUMBER;
+
     return this.buildHandlerResultPayload({
-      customJourneyContext: { failedAttempts, STEP: GVAGoalSteps.VALIDATE_MEMBER_NUMBER },
+      customJourneyContext,
       responseId: this.config.gvaGoals.invalidMemberNumber,
     });
   }
@@ -91,14 +98,21 @@ export class GVAGoalService extends BaseGVAGoalService {
   async validatePin(context: HandlerPayload): Promise<HandlerResult> {
     await this.logger.info(`EngagementId: ${context.engagementId}, Validating PIN`);
 
+    const customJourneyContext = this.getCustomJurneyContext(context);
+    const limit = Number(this.config.inputValidationFailedAttemptsLimit) || 3;
+    let enterPinFailedAttempts = Number(customJourneyContext.enterPinFailedAttempts || 0);
+
     if (context.messageType === 'text' && context.text) {
       const userInput = context.text.trim();
+
       if (MEMBER_PIN_REGEX.test(userInput)) {
         await this.logger.info(`EngagementId: ${context.engagementId}, Valid PIN received: ${userInput}`);
         // get MEMBER NUMBER from KV store
         // validate PIN and MEMBER NUMBER
+        customJourneyContext.enterPinFailedAttempts = 0; // reset on success
+        customJourneyContext.STEP = null;
         return this.buildHandlerResultPayload({
-          customJourneyContext: { STEP: null },
+          customJourneyContext,
           isFinalStep: true,
           responseId: this.config.gvaGoals.successfullyVerifiesMemberNumberAndPin,
         });
@@ -106,17 +120,48 @@ export class GVAGoalService extends BaseGVAGoalService {
 
       if (FORGET_THE_PIN.test(userInput.toLowerCase())) {
         await this.logger.info(`EngagementId: ${context.engagementId}, User forgot PIN`);
+        customJourneyContext.STEP = null;
         return this.buildHandlerResultPayload({
-          customJourneyContext: { STEP: null },
+          customJourneyContext,
           isFinalStep: true,
           responseId: this.config.gvaGoals.forgotPin,
         });
       }
     }
 
-    await this.logger.info(`EngagementId: ${context.engagementId}, Invalid PIN`);
+    // Invalid PIN path
+    enterPinFailedAttempts += 1;
+    customJourneyContext.enterPinFailedAttempts = enterPinFailedAttempts;
+
+    if (enterPinFailedAttempts >= limit) {
+      // 3-я (або limit-та) спроба → не показуємо "Invalid PIN", одразу ескалація
+      await this.logger.info(
+        `EngagementId: ${context.engagementId}, Exceeded allowed PIN attempts (${enterPinFailedAttempts}/${limit}), escalating`,
+      );
+
+      // Якщо у конфігу є окрема картка для локауту PIN — використовуємо її, інакше фолбек на transferToLiveOperator
+      // const lockoutResponseId = (this.config.gvaGoals as any).pinattemptsexceeded ?? this.config.gvaGoals.transferToLiveOperator;
+
+      return this.buildHandlerResultPayload({
+        isFinalStep: true,
+        responseId: this.config.gvaGoals.pinattemptsexceeded,
+      });
+    }
+
+    // Показуємо повідомлення з лічильником тільки для спроб 1..(limit-1)
+    const attemptsText = `The PIN you entered was incorrect. Please try again. (Attempt ${enterPinFailedAttempts} of ${limit})`;
+    await this.logger.info(`EngagementId: ${context.engagementId}, Invalid PIN, attempt ${enterPinFailedAttempts} of ${limit}`);
+
+    customJourneyContext.STEP = GVAGoalSteps.VALIDATE_PIN;
+
     return this.buildHandlerResultPayload({
-      customJourneyContext: { STEP: GVAGoalSteps.VALIDATE_PIN },
+      customJourneyContext,
+      // Можна використати існуючу картку invalidPin і підтягнути текст із responseData
+      responseData: {
+        pinAttemptCounterText: attemptsText,
+        pinAttemptNumber: enterPinFailedAttempts,
+        pinAttemptsLimit: limit,
+      },
       responseId: this.config.gvaGoals.invalidPin,
     });
   }

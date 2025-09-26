@@ -13,7 +13,12 @@
     "generate-types": "wrangler types",
     "typecheck": "npx tsc --noEmit",
     "postinstall": "cd ../.. && npm install --no-audit --no-fund || true",
-    "replay": "tsx scripts/replay.ts --payload fixtures/payload.json --env .dev.vars"
+    "replay": "tsx scripts/replay.ts --payload fixtures/payload.json --env .dev.vars",
+    "replay:member": "tsx scripts/replay.ts --payload fixtures/member_ok.json --env .dev.vars",
+    "replay:zero": "tsx scripts/replay.ts --payload fixtures/member_zero.json --env .dev.vars",
+    "replay:fail": "tsx scripts/replay.ts --payload fixtures/member_fail_limit.json --env .dev.vars",
+    "replay:pin": "tsx scripts/replay.ts --payload fixtures/pin_ok.json --env .dev.vars",
+    "replay:forgot": "tsx scripts/replay.ts --payload fixtures/pin_forgot.json --env .dev.vars"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.8.56",

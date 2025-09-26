@@ -11,17 +11,23 @@ export class RequestHandler {
   ) {
     this.gvaGoalService = new GVAGoalService(config, logger);
   }
-
   async handleRequest(requestPayload: BaseRequestPayload): Promise<ServiceResponse<unknown>> {
     const gvaPayload = this.gvaGoalService.parsePayload(requestPayload.payload);
     if (!gvaPayload.status) {
       const errorMessage = `${CatalogErrors.FAILED_GVA_PAYLOAD}: ${gvaPayload.message}`;
       await this.logger.error(errorMessage);
-      return {
-        error: errorMessage,
-        status: false,
-      };
+      return { error: errorMessage, status: false };
     }
+    // async handleRequest(requestPayload: BaseRequestPayload): Promise<ServiceResponse<unknown>> {
+    //   const gvaPayload = this.gvaGoalService.parsePayload(requestPayload.payload);
+    //   if (!gvaPayload.status) {
+    //     const errorMessage = `${CatalogErrors.FAILED_GVA_PAYLOAD}: ${gvaPayload.message}`;
+    //     await this.logger.error(errorMessage);
+    //     return {
+    //       error: errorMessage,
+    //       status: false,
+    //     };
+    //   }
 
     let customJourneyContext: Record<string, unknown> = {};
     if (gvaPayload.output.customJourneyContext) {
@@ -32,10 +38,17 @@ export class RequestHandler {
     }
 
     const step = typeof customJourneyContext.STEP === 'string' ? customJourneyContext.STEP : INITIAL_STEP;
-
+    // ✅ New logs
+    await this.logger.info(`EngagementId: ${gvaPayload.output.engagementId}, GVA Step selected: ${step}`);
     try {
       const stepHandler = this.gvaGoalService.resolve(step);
       const result = await stepHandler(gvaPayload.output);
+      // ✅ log rusults before sending the responce
+      await this.logger.info(
+        `EngagementId: ${gvaPayload.output.engagementId}, 
+        GVA Step result: responseId=${result.responseId}, 
+        isFinalStep=${!!result.isFinalStep}`,
+      );
       return {
         ...result,
         customJourneyContext: JSON.stringify(result.customJourneyContext),

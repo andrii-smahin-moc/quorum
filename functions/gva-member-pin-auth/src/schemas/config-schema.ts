@@ -17,6 +17,7 @@ export const BaseEnvironmentSchema = v.object({
   GOAL_INVALID_MEMBER_NUMBER: v.string(),
   GOAL_INVALID_PIN: v.string(),
   GOAL_NEED_TO_AUTHENTICATION: v.string(),
+  GOAL_PIN_ATTEMPTS_EXCEEDED: v.string(),
   GOAL_SUCCESSFULLY_VERIFIES_MEMBER_NUMBER_AND_PIN: v.string(),
   GOAL_TRANSFER_TO_LIVE_OPERATOR: v.string(),
   GOAL_ZERO_PRESS: v.string(),

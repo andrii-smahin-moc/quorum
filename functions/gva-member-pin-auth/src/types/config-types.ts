@@ -27,6 +27,7 @@ export interface GVAGoals {
   invalidPin: string;
   forgotPin: string;
   zeroPress: string;
+  pinattemptsexceeded: string;
 }
 
 export interface GliaAIConfig {
