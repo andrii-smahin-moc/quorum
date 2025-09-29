@@ -35,7 +35,7 @@ export class QuorumApi {
     const url = `${this.config.quorumConfig.quorumApiDomain}/auth/pin`;
     return this.httpRequest.fetchWithRetry<UnknownResponse>(url, requestOptions, 'verifyMemberExists');
   }
-  verifyMemberPin(idValue: string, memberPin: number): Promise<UnknownResponse> {
+  verifyMemberPin(idValue: string, pin: string): Promise<UnknownResponse> {
     const headers = new Headers();
     headers.append('Content-Type', 'application/json');
     headers.append('X-GVA-API-Key', this.config.quorumConfig.quorumApiHeader);
@@ -47,7 +47,7 @@ export class QuorumApi {
           idValue,
         },
       ],
-      pin: memberPin,
+      pin,
     });
 
     const requestOptions = {
@@ -57,6 +57,6 @@ export class QuorumApi {
     };
 
     const url = `${this.config.quorumConfig.quorumApiDomain}/auth/pin/verify`;
-    return this.httpRequest.fetchWithRetry<UnknownResponse>(url, requestOptions, 'verifyMemberExists');
+    return this.httpRequest.fetchWithRetry<UnknownResponse>(url, requestOptions, 'verifyMemberPin');
   }
 }

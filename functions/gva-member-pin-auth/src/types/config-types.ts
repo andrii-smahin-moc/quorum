@@ -19,7 +19,6 @@ export interface GliaConfig {
 
 export interface GVAGoals {
   needToAuthentication: string;
-  transferToLiveOperator: string;
   alreadyAuthenticated: string;
   successfullyVerifiesMemberNumberAndPin: string;
   enterAPin: string;
@@ -28,6 +27,7 @@ export interface GVAGoals {
   forgotPin: string;
   zeroPress: string;
   pinattemptsexceeded: string;
+  transferToLiveOperator: string;
 }
 
 export interface GliaAIConfig {
@@ -53,5 +53,4 @@ export interface FunctionConfig {
   retryDelay: number;
   inputValidationFailedAttemptsLimit: number;
   quorumConfig: QuorumConfig;
-  quaorumApiDomain: string;
 }

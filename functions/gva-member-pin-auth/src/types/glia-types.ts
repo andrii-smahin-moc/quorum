@@ -11,6 +11,10 @@ export interface HandlerResult {
   isFinalStep: boolean;
   transferToHuman: boolean;
   customPayload: Record<string, unknown>;
+  auth?: {
+    expiresIn: number;
+    token: string;
+  };
 }
 
 export type GoalStepHandler = (context: HandlerPayload) => Promise<HandlerResult>;

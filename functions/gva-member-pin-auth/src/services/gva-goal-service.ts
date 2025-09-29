@@ -1,3 +1,4 @@
+import { QuorumApi } from '../apis';
 import { FORGET_THE_PIN, INITIAL_STEP, MEMBER_NUMBER_REGEX, MEMBER_PIN_REGEX } from '../constants';
 import { FunctionConfig, HandlerPayload, HandlerResult, LoggerInterface } from '../types';
 
@@ -17,11 +18,13 @@ export const AnswerOptionsList = {
 
 export class GVAGoalService extends BaseGVAGoalService {
   private answerDetectorService: AnswerDetectorService;
+  private quorumApi: QuorumApi;
   constructor(
     private config: FunctionConfig,
     private logger: LoggerInterface,
   ) {
     super();
+    this.quorumApi = new QuorumApi(config, logger);
     this.register(INITIAL_STEP, this.initialStep.bind(this));
     this.register(GVAGoalSteps.VALIDATE_MEMBER_NUMBER, this.validateMemberNumber.bind(this));
     this.register(GVAGoalSteps.VALIDATE_PIN, this.validatePin.bind(this));
@@ -41,7 +44,7 @@ export class GVAGoalService extends BaseGVAGoalService {
     customJourneyContext.STEP = GVAGoalSteps.VALIDATE_MEMBER_NUMBER;
 
     return this.buildHandlerResultPayload({
-      // <<< прокинутий існуючий контекст + новий STEP
+      // need to integrate existing context and new STEP
       customJourneyContext,
       responseId: this.config.gvaGoals.needToAuthentication,
     });
@@ -55,16 +58,20 @@ export class GVAGoalService extends BaseGVAGoalService {
 
     let failedAttempts = Number(customJourneyContext.failedAttempts ?? 0);
 
-    if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.MEMBER_NUMBER) {
+    if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.MEMBER_NUMBER && detectedAnswer.matchedText) {
       await this.logger.info(`EngagementId: ${context.engagementId}, Valid member number received: ${detectedAnswer.matchedText}`);
-      // save member number to KV store
-      // send OTP to visitor
-      customJourneyContext.failedAttempts = 0; // reset attempts on success
-      customJourneyContext.STEP = GVAGoalSteps.VALIDATE_PIN;
-      return this.buildHandlerResultPayload({
-        customJourneyContext,
-        responseId: this.config.gvaGoals.enterAPin,
-      });
+      // validate member number via Quorum API
+      const isMemberExists = await this.verifyIsMemberExists(detectedAnswer.matchedText);
+
+      if (isMemberExists) {
+        customJourneyContext.memberNumber = detectedAnswer.matchedText;
+        customJourneyContext.failedAttempts = 0; // reset attempts on success
+        customJourneyContext.STEP = GVAGoalSteps.VALIDATE_PIN;
+        return this.buildHandlerResultPayload({
+          customJourneyContext,
+          responseId: this.config.gvaGoals.enterAPin,
+        });
+      }
     }
 
     if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.ZERO_NUMBER) {
@@ -78,7 +85,9 @@ export class GVAGoalService extends BaseGVAGoalService {
     failedAttempts += 1;
     customJourneyContext.failedAttempts = failedAttempts;
 
-    if (failedAttempts >= this.config.inputValidationFailedAttemptsLimit) {
+    const attemptLimit = this.config.inputValidationFailedAttemptsLimit;
+
+    if (failedAttempts >= attemptLimit) {
       await this.logger.info(`EngagementId: ${context.engagementId}, Too many failed attempts`);
       return this.buildHandlerResultPayload({
         isFinalStep: true,
@@ -99,7 +108,6 @@ export class GVAGoalService extends BaseGVAGoalService {
     await this.logger.info(`EngagementId: ${context.engagementId}, Validating PIN`);
 
     const customJourneyContext = this.getCustomJurneyContext(context);
-    const limit = Number(this.config.inputValidationFailedAttemptsLimit) || 3;
     let enterPinFailedAttempts = Number(customJourneyContext.enterPinFailedAttempts || 0);
 
     if (context.messageType === 'text' && context.text) {
@@ -107,8 +115,34 @@ export class GVAGoalService extends BaseGVAGoalService {
 
       if (MEMBER_PIN_REGEX.test(userInput)) {
         await this.logger.info(`EngagementId: ${context.engagementId}, Valid PIN received: ${userInput}`);
-        // get MEMBER NUMBER from KV store
-        // validate PIN and MEMBER NUMBER
+        const memberNumber = customJourneyContext.memberNumber;
+
+        if (!memberNumber || typeof memberNumber !== 'string') {
+          await this.logger.error(`EngagementId: ${context.engagementId}, memberNumber is missing or invalid in customJourneyContext`);
+          return this.buildHandlerResultPayload({
+            isFinalStep: true,
+            responseId: this.config.gvaGoals.invalidMemberNumber,
+          });
+        }
+
+        // сходить на API і перевірить пін
+        const authResult = await this.verifyMemberPin(String(customJourneyContext.memberNumber), context.text);
+        if (authResult && typeof authResult.token === 'string' && typeof authResult.expiresIn === 'string') {
+          await this.logger.info(`EngagementId: ${context.engagementId}, PIN verified successfully`);
+
+          return this.buildHandlerResultPayload({
+            auth: {
+              expiresIn: Number(authResult.expiresIn),
+              token: authResult.token,
+            },
+            customJourneyContext,
+            isFinalStep: true,
+            responseId: this.config.gvaGoals.successfullyVerifiesMemberNumberAndPin,
+          });
+        }
+        // якщо існує відповідну текстовку
+        // якщо ні то Invalid PIN path
+
         customJourneyContext.enterPinFailedAttempts = 0; // reset on success
         customJourneyContext.STEP = null;
         return this.buildHandlerResultPayload({
@@ -133,34 +167,32 @@ export class GVAGoalService extends BaseGVAGoalService {
     enterPinFailedAttempts += 1;
     customJourneyContext.enterPinFailedAttempts = enterPinFailedAttempts;
 
-    if (enterPinFailedAttempts >= limit) {
-      // 3-я (або limit-та) спроба → не показуємо "Invalid PIN", одразу ескалація
-      await this.logger.info(
-        `EngagementId: ${context.engagementId}, Exceeded allowed PIN attempts (${enterPinFailedAttempts}/${limit}), escalating`,
-      );
+    const attemptLimit = this.config.inputValidationFailedAttemptsLimit;
 
-      // Якщо у конфігу є окрема картка для локауту PIN — використовуємо її, інакше фолбек на transferToLiveOperator
-      // const lockoutResponseId = (this.config.gvaGoals as any).pinattemptsexceeded ?? this.config.gvaGoals.transferToLiveOperator;
+    if (enterPinFailedAttempts >= attemptLimit) {
+      // Exceeded allowed attempts or limit > do not show invalid pin message > immediate escalation
+      await this.logger.info(
+        `EngagementId: ${context.engagementId}, Exceeded allowed PIN attempts ` + `(${enterPinFailedAttempts}/${attemptLimit}), escalating`,
+      );
 
       return this.buildHandlerResultPayload({
         isFinalStep: true,
         responseId: this.config.gvaGoals.pinattemptsexceeded,
       });
     }
-
-    // Показуємо повідомлення з лічильником тільки для спроб 1..(limit-1)
-    const attemptsText = `The PIN you entered was incorrect. Please try again. (Attempt ${enterPinFailedAttempts} of ${limit})`;
-    await this.logger.info(`EngagementId: ${context.engagementId}, Invalid PIN, attempt ${enterPinFailedAttempts} of ${limit}`);
+    // Show invalid PIN message with attempt counter 1..(limit-1)
+    const attemptsText = `The PIN you entered was incorrect. Please try again. (Attempt ${enterPinFailedAttempts} of ${attemptLimit})`;
+    await this.logger.info(`EngagementId: ${context.engagementId}, Invalid PIN, attempt ${enterPinFailedAttempts} of ${attemptLimit}`);
 
     customJourneyContext.STEP = GVAGoalSteps.VALIDATE_PIN;
 
     return this.buildHandlerResultPayload({
       customJourneyContext,
-      // Можна використати існуючу картку invalidPin і підтягнути текст із responseData
+      // Able to use existing invalidPin card and pull text from responseData
       responseData: {
         pinAttemptCounterText: attemptsText,
         pinAttemptNumber: enterPinFailedAttempts,
-        pinAttemptsLimit: limit,
+        pinAttemptsLimit: this.config.inputValidationFailedAttemptsLimit,
       },
       responseId: this.config.gvaGoals.invalidPin,
     });
@@ -175,5 +207,28 @@ export class GVAGoalService extends BaseGVAGoalService {
       }
     }
     return customJourneyContext;
+  }
+
+  private async verifyIsMemberExists(memberNumber: string) {
+    try {
+      const response = await this.quorumApi.verifyMemberExists(memberNumber);
+      if (response) {
+        return true;
+      }
+      return false;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error in setValueToKV';
+      await this.logger.error(`Error verifying member existence: ${message}`);
+      return false;
+    }
+  }
+  private async verifyMemberPin(memberNumber: string, pin: string) {
+    try {
+      return this.quorumApi.verifyMemberPin(memberNumber, pin);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error in setValueToKV';
+      await this.logger.error(`Error verifying member PIN: ${message}`);
+      return null;
+    }
   }
 }
