@@ -53,7 +53,7 @@ export class GVAGoalService extends BaseGVAGoalService {
   async validateMemberNumber(context: HandlerPayload): Promise<HandlerResult> {
     await this.logger.info(`EngagementId: ${context.engagementId}, Validating member number`);
 
-    const detectedAnswer = this.answerDetectorService.detect(context);
+    const detectedAnswer = await this.answerDetectorService.detect(context);
     const customJourneyContext = this.getCustomJurneyContext(context);
 
     let failedAttempts = Number(customJourneyContext.failedAttempts ?? 0);
@@ -106,7 +106,7 @@ export class GVAGoalService extends BaseGVAGoalService {
   async validatePin(context: HandlerPayload): Promise<HandlerResult> {
     await this.logger.info(`EngagementId: ${context.engagementId}, Validating PIN`);
 
-    const detectedAnswer = this.answerDetectorService.detect(context);
+    const detectedAnswer = await this.answerDetectorService.detect(context);
     const customJourneyContext = this.getCustomJurneyContext(context);
     let enterPinFailedAttempts = Number(customJourneyContext.enterPinFailedAttempts || 0);
 

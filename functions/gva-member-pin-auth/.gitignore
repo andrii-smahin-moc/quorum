@@ -177,5 +177,5 @@ scripts
 .DS_Store
 
 glia-ai-sdk.json
-gva-member-pin-auth
+gva-member-pin-auth.js
 /fixtures/
