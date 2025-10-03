@@ -197,7 +197,7 @@ export class GVAGoalService extends BaseGVAGoalService {
   }
   private async verifyMemberPin(memberNumber: string, pin: string) {
     try {
-      return this.quorumApi.verifyMemberPin(memberNumber, pin);
+      return await this.quorumApi.verifyMemberPin(memberNumber, pin);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error in setValueToKV';
       await this.logger.error(`Error verifying member PIN: ${message}`);

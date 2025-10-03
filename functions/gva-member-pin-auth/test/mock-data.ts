@@ -1,0 +1,82 @@
+export const validEnv = {
+  CALL_RETRIES: '3',
+  DD_API_KEY: 'test-dd-api-key',
+  FDMS_VERSION: '1.0.0',
+  IS_DEV_MOD: 'true',
+  REQUEST_TIMEOUT: '10',
+  RETRY_DELAY: '20',
+  SITE_ID: 'test-site-id',
+
+  GLIA_API_DOMAIN: 'https://glia.example.com',
+  GLIA_USER_API_KEY: 'test-user-api-key',
+  GLIA_USER_API_KEY_SECRET: 'test-user-api-key-secret',
+
+  PROMPT_DETECT_CONFIDENCE: '0.7',
+  PROMPT_OPTION_DETECTOR: 'Choose the best option:',
+  GLIA_AI_MAX_TOKENS: '256',
+  GLIA_AI_STOP_SEQUENCES: 'END, STOP',
+  GLIA_AI_TEMPERATURE: '0.4',
+
+  GOAL_ALREADY_AUTHENTICATED: 'GOAL_ALREADY_AUTHENTICATED',
+  GOAL_ENTER_A_PIN: 'GOAL_ENTER_A_PIN',
+  GOAL_FORGOT_PIN: 'GOAL_FORGOT_PIN',
+  GOAL_INVALID_MEMBER_NUMBER: 'GOAL_INVALID_MEMBER_NUMBER',
+  GOAL_INVALID_PIN: 'GOAL_INVALID_PIN',
+  GOAL_NEED_TO_AUTHENTICATION: 'GOAL_NEED_TO_AUTHENTICATION',
+  GOAL_PIN_ATTEMPTS_EXCEEDED: 'GOAL_PIN_ATTEMPTS_EXCEEDED',
+  GOAL_SUCCESSFULLY_VERIFIES_MEMBER_NUMBER_AND_PIN: 'GOAL_SUCCESSFULLY_VERIFIES_MEMBER_NUMBER_AND_PIN',
+  GOAL_TRANSFER_TO_LIVE_OPERATOR: 'GOAL_TRANSFER_TO_LIVE_OPERATOR',
+  GOAL_ZERO_PRESS: 'GOAL_ZERO_PRESS',
+
+  FAIL_ATTEMPTS: '3',
+
+  QUORUM_API_DOMAIN: 'https://api.quorum.example',
+  QUORUM_API_HEADER: 'x-api-key-123',
+};
+
+export const expectedValidConfig = {
+  callRetries: 3,
+  dataDog: {
+    callRetries: 3,
+    customer: 'quorum',
+    ddApiKey: validEnv.DD_API_KEY,
+    functionName: 'gva-member-pin-auth-function',
+    isDevMode: true,
+    requestTimeout: 10,
+    retryDelay: 20,
+    siteId: validEnv.SITE_ID,
+    version: validEnv.FDMS_VERSION,
+  },
+  glia: {
+    apiDomain: validEnv.GLIA_API_DOMAIN,
+    siteId: validEnv.SITE_ID,
+    userApiKey: validEnv.GLIA_USER_API_KEY,
+    userApiKeySecret: validEnv.GLIA_USER_API_KEY_SECRET,
+  },
+  gliaAI: {
+    detectConfidence: 0.7,
+    detectOptionPrompt: validEnv.PROMPT_OPTION_DETECTOR,
+    maxTokens: 256,
+    stopSequences: ['END', 'STOP'],
+    temperature: 0.4,
+  },
+  gvaGoals: {
+    alreadyAuthenticated: validEnv.GOAL_ALREADY_AUTHENTICATED,
+    enterAPin: validEnv.GOAL_ENTER_A_PIN,
+    forgotPin: validEnv.GOAL_FORGOT_PIN,
+    invalidMemberNumber: validEnv.GOAL_INVALID_MEMBER_NUMBER,
+    invalidPin: validEnv.GOAL_INVALID_PIN,
+    needToAuthentication: validEnv.GOAL_NEED_TO_AUTHENTICATION,
+    pinattemptsexceeded: validEnv.GOAL_PIN_ATTEMPTS_EXCEEDED,
+    successfullyVerifiesMemberNumberAndPin: validEnv.GOAL_SUCCESSFULLY_VERIFIES_MEMBER_NUMBER_AND_PIN,
+    transferToLiveOperator: validEnv.GOAL_TRANSFER_TO_LIVE_OPERATOR,
+    zeroPress: validEnv.GOAL_ZERO_PRESS,
+  },
+  inputValidationFailedAttemptsLimit: 3,
+  quorumConfig: {
+    quorumApiDomain: validEnv.QUORUM_API_DOMAIN,
+    quorumApiHeader: validEnv.QUORUM_API_HEADER,
+  },
+  requestTimeout: 10,
+  retryDelay: 20,
+};
