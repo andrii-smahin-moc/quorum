@@ -12,6 +12,7 @@ export interface DataDogConfig {
 
 export interface GliaConfig {
   apiDomain: string;
+  gliaLiveOperatorQueue: string;
   siteId: string;
   userApiKey: string;
   userApiKeySecret: string;
