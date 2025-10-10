@@ -26,7 +26,7 @@ export interface GVAGoals {
   invalidPin: string;
   forgotPin: string;
   zeroPress: string;
-  pinattemptsexceeded: string;
+  pinAttemptExceeded: string;
   transferToLiveOperator: string;
 }
 

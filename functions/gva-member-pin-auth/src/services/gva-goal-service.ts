@@ -1,9 +1,12 @@
 import { QuorumApi } from '../apis';
 import { INITIAL_STEP, MEMBER_NUMBER_REGEX, MEMBER_PIN_REGEX, ZERO_NUMBER } from '../constants';
-import { FunctionConfig, HandlerPayload, HandlerResult, LoggerInterface } from '../types';
+import { GliaKVValueSchema } from '../schemas';
+import { FunctionConfig, HandlerPayload, HandlerResult, IdentifierFailedAttemptsHistory, KvStoreFactory, LoggerInterface } from '../types';
+import { validateSchema } from '../validator';
 
 import { AnswerDetectorService } from './answer-detector-service';
 import { BaseGVAGoalService } from './base-gva-goal-service';
+import { GliaKVService } from './glia-kv-service';
 import { AnswerOption } from './possible-answer';
 
 export enum GVAGoalSteps {
@@ -20,13 +23,17 @@ export const AnswerOptionsList = {
 
 export class GVAGoalService extends BaseGVAGoalService {
   private answerDetectorService: AnswerDetectorService;
+  private gliaKVService: GliaKVService;
   private quorumApi: QuorumApi;
+
   constructor(
     private config: FunctionConfig,
     private logger: LoggerInterface,
+    kvStoreFactory: KvStoreFactory,
   ) {
     super();
     this.quorumApi = new QuorumApi(config, logger);
+    this.gliaKVService = new GliaKVService(config, logger, kvStoreFactory);
     this.register(INITIAL_STEP, this.initialStep.bind(this));
     this.register(GVAGoalSteps.VALIDATE_MEMBER_NUMBER, this.validateMemberNumber.bind(this));
     this.register(GVAGoalSteps.VALIDATE_PIN, this.validatePin.bind(this));
@@ -41,7 +48,7 @@ export class GVAGoalService extends BaseGVAGoalService {
 
   async initialStep(context: HandlerPayload): Promise<HandlerResult> {
     await this.logger.info(`EngagementId: ${context.engagementId}, Starting initial step`);
-    const customJourneyContext = this.getCustomJurneyContext(context);
+    const customJourneyContext = this.getCustomJourneyContext(context);
     customJourneyContext.STEP = GVAGoalSteps.VALIDATE_MEMBER_NUMBER;
 
     return this.buildHandlerResultPayload({
@@ -54,15 +61,44 @@ export class GVAGoalService extends BaseGVAGoalService {
     await this.logger.info(`EngagementId: ${context.engagementId}, Validating member number`);
 
     const detectedAnswer = await this.answerDetectorService.detect(context);
-    const customJourneyContext = this.getCustomJurneyContext(context);
+    const customJourneyContext = this.getCustomJourneyContext(context);
 
     let failedAttempts = Number(customJourneyContext.failedAttempts ?? 0);
 
+    if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.ZERO_NUMBER) {
+      await this.logger.info(`EngagementId: ${context.engagementId}, Zero press detected`);
+      return this.buildHandlerResultPayload({
+        isFinalStep: true,
+        responseId: this.config.gvaGoals.zeroPress,
+      });
+    }
+
     if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.MEMBER_NUMBER && detectedAnswer.matchedText) {
       await this.logger.info(`EngagementId: ${context.engagementId}, Valid member number received: ${detectedAnswer.matchedText}`);
-      const isMemberExists = await this.verifyIsMemberExists(detectedAnswer.matchedText);
 
-      if (isMemberExists) {
+      const failedAttempts = await this.getFailedAttempts(detectedAnswer.matchedText);
+      if (failedAttempts.length >= this.config.inputValidationFailedAttemptsLimit) {
+        await this.logger.info(
+          `EngagementId: ${context.engagementId}, Member number ${detectedAnswer.matchedText} has too many failed attempts`,
+        );
+        // transfer to live operator
+        return this.buildHandlerResultPayload({
+          isFinalStep: true,
+          responseId: this.config.gvaGoals.transferToLiveOperator,
+        });
+      }
+
+      const isMemberExistsResponse = await this.verifyIsMemberExists(detectedAnswer.matchedText);
+
+      if (isMemberExistsResponse && isMemberExistsResponse.statusCode === 503) {
+        // update it and start OTP flow
+        return this.buildHandlerResultPayload({
+          isFinalStep: true,
+          responseId: this.config.gvaGoals.transferToLiveOperator,
+        });
+      }
+
+      if (isMemberExistsResponse && isMemberExistsResponse.ok) {
         customJourneyContext.memberNumber = detectedAnswer.matchedText;
         customJourneyContext.failedAttempts = 0;
         customJourneyContext.STEP = GVAGoalSteps.VALIDATE_PIN;
@@ -71,14 +107,6 @@ export class GVAGoalService extends BaseGVAGoalService {
           responseId: this.config.gvaGoals.enterAPin,
         });
       }
-    }
-
-    if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.ZERO_NUMBER) {
-      await this.logger.info(`EngagementId: ${context.engagementId}, Zero press detected`);
-      return this.buildHandlerResultPayload({
-        isFinalStep: true,
-        responseId: this.config.gvaGoals.zeroPress,
-      });
     }
 
     failedAttempts += 1;
@@ -107,28 +135,46 @@ export class GVAGoalService extends BaseGVAGoalService {
     await this.logger.info(`EngagementId: ${context.engagementId}, Validating PIN`);
 
     const detectedAnswer = await this.answerDetectorService.detect(context);
-    const customJourneyContext = this.getCustomJurneyContext(context);
-    let enterPinFailedAttempts = Number(customJourneyContext.enterPinFailedAttempts || 0);
+    const customJourneyContext = this.getCustomJourneyContext(context);
+
+    const memberNumber = this.getMemberNumberFromContext(customJourneyContext);
+
+    if (!memberNumber) {
+      await this.logger.error(`EngagementId: ${context.engagementId}, memberNumber is missing or invalid in customJourneyContext`);
+      return this.buildHandlerResultPayload({
+        isFinalStep: true,
+        responseId: this.config.gvaGoals.invalidMemberNumber,
+      });
+    }
+
+    const failedAttempts = await this.getFailedAttempts(memberNumber);
+    if (failedAttempts.length >= this.config.inputValidationFailedAttemptsLimit) {
+      await this.logger.info(`EngagementId: ${context.engagementId}, Member number ${memberNumber} has too many failed attempts`);
+      // transfer to live operator
+      return this.buildHandlerResultPayload({
+        isFinalStep: true,
+        responseId: this.config.gvaGoals.transferToLiveOperator,
+      });
+    }
 
     if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.MEMBER_PIN && detectedAnswer.matchedText) {
       await this.logger.info(`EngagementId: ${context.engagementId}, Valid PIN received: ${detectedAnswer.matchedText}`);
-      const memberNumber = customJourneyContext.memberNumber;
 
-      if (!memberNumber || typeof memberNumber !== 'string') {
-        await this.logger.error(`EngagementId: ${context.engagementId}, memberNumber is missing or invalid in customJourneyContext`);
-        return this.buildHandlerResultPayload({
-          isFinalStep: true,
-          responseId: this.config.gvaGoals.invalidMemberNumber,
-        });
-      }
-      const authResult = await this.verifyMemberPin(String(customJourneyContext.memberNumber), detectedAnswer.matchedText);
-      if (authResult && typeof authResult.token === 'string' && typeof authResult.expiresIn === 'string') {
+      const authResultResponse = await this.verifyMemberPin(memberNumber, detectedAnswer.matchedText);
+      if (
+        authResultResponse &&
+        authResultResponse.ok &&
+        typeof authResultResponse.payload.token === 'string' &&
+        typeof authResultResponse.payload.expiresIn === 'string'
+      ) {
         await this.logger.info(`EngagementId: ${context.engagementId}, PIN verified successfully`);
+
+        await this.resetFailedAttemptsHistory(memberNumber);
 
         return this.buildHandlerResultPayload({
           auth: {
-            expiresIn: Number(authResult.expiresIn),
-            token: authResult.token,
+            expiresIn: Number(authResultResponse.payload.expiresIn),
+            token: authResultResponse.payload.token,
           },
           isFinalStep: true,
           responseId: this.config.gvaGoals.successfullyVerifiesMemberNumberAndPin,
@@ -142,22 +188,23 @@ export class GVAGoalService extends BaseGVAGoalService {
         responseId: this.config.gvaGoals.forgotPin,
       });
     }
-    enterPinFailedAttempts += 1;
-    customJourneyContext.enterPinFailedAttempts = enterPinFailedAttempts;
+
+    const newFailedAttempts = await this.saveFailedAttempt(memberNumber, failedAttempts);
 
     const attemptLimit = this.config.inputValidationFailedAttemptsLimit;
 
-    if (enterPinFailedAttempts >= attemptLimit) {
+    if (newFailedAttempts.length >= attemptLimit) {
       await this.logger.info(
-        `EngagementId: ${context.engagementId}, Exceeded allowed PIN attempts ` + `(${enterPinFailedAttempts}/${attemptLimit}), escalating`,
+        `EngagementId: ${context.engagementId}, Exceeded allowed PIN attempts ` +
+          `(${newFailedAttempts.length}/${attemptLimit}), escalating`,
       );
 
       return this.buildHandlerResultPayload({
         isFinalStep: true,
-        responseId: this.config.gvaGoals.pinattemptsexceeded,
+        responseId: this.config.gvaGoals.pinAttemptExceeded,
       });
     }
-    await this.logger.info(`EngagementId: ${context.engagementId}, Invalid PIN, attempt ${enterPinFailedAttempts} of ${attemptLimit}`);
+    await this.logger.info(`EngagementId: ${context.engagementId}, Invalid PIN, attempt ${newFailedAttempts.length} of ${attemptLimit}`);
 
     customJourneyContext.STEP = GVAGoalSteps.VALIDATE_PIN;
 
@@ -165,13 +212,13 @@ export class GVAGoalService extends BaseGVAGoalService {
       customJourneyContext,
       responseData: {
         pinAttemptLimit: this.config.inputValidationFailedAttemptsLimit,
-        pinAttemptNumber: enterPinFailedAttempts,
+        pinAttemptNumber: newFailedAttempts.length,
       },
       responseId: this.config.gvaGoals.invalidPin,
     });
   }
 
-  private getCustomJurneyContext(context: HandlerPayload) {
+  private getCustomJourneyContext(context: HandlerPayload) {
     let customJourneyContext: Record<string, unknown> = {};
     if (context.customJourneyContext) {
       const parseResult = this.safeJSONParse(context.customJourneyContext);
@@ -182,13 +229,59 @@ export class GVAGoalService extends BaseGVAGoalService {
     return customJourneyContext;
   }
 
+  private async getFailedAttempts(identifierValue: string): Promise<number[]> {
+    const history = await this.getValueFromKV<IdentifierFailedAttemptsHistory>(identifierValue);
+    const recent = this.reviseFailedAttemptsHistory(history?.failedAttempts ?? []);
+    return recent;
+  }
+
+  private getMemberNumberFromContext(customJourneyContext: Record<string, unknown>): string | null {
+    return typeof customJourneyContext.memberNumber === 'string' ? customJourneyContext.memberNumber : null;
+  }
+
+  private async getValueFromKV<T>(key: string): Promise<T | null> {
+    try {
+      const raw = await this.gliaKVService.getValue(key);
+      const result = validateSchema(GliaKVValueSchema, raw, 'getValueFromKV');
+      if (!result.status || !result.output?.value) {
+        return null;
+      }
+      return JSON.parse(result.output.value) as T;
+    } catch (error) {
+      await this.logger.error(`getValueFromKV failed for key ${key}: ${String(error)}`);
+      return null;
+    }
+  }
+
+  private async resetFailedAttemptsHistory(identifier: string): Promise<void> {
+    await this.saveToKvStore(identifier, JSON.stringify({ failedAttempts: [] }));
+  }
+
+  private reviseFailedAttemptsHistory(attempts: number[]): number[] {
+    const limit = 24 * 60 * 60 * 1000; // 24 hours
+    return attempts.filter((t) => Date.now() - t < limit);
+  }
+
+  private async saveFailedAttempt(memberNumber: string, failedAttempts: number[]): Promise<number[]> {
+    failedAttempts.push(Date.now());
+    await this.saveToKvStore(memberNumber, JSON.stringify({ failedAttempts }));
+    return failedAttempts;
+  }
+
+  private async saveToKvStore(engagementId: string, value: string): Promise<boolean> {
+    try {
+      await this.gliaKVService.setValue(engagementId, value);
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error in setValueToKV';
+      await this.logger.error(`Error saving to KV store: ${message}`);
+      return false;
+    }
+  }
+
   private async verifyIsMemberExists(memberNumber: string) {
     try {
-      const response = await this.quorumApi.verifyMemberExists(memberNumber);
-      if (response) {
-        return true;
-      }
-      return false;
+      return await this.quorumApi.verifyMemberExists(memberNumber);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error in setValueToKV';
       await this.logger.error(`Error verifying member existence: ${message}`);

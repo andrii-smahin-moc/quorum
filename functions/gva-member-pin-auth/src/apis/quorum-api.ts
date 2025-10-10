@@ -1,4 +1,4 @@
-import type { FunctionConfig, LoggerInterface, UnknownResponse } from '../types';
+import type { FunctionConfig, HttpResponse, LoggerInterface, UnknownResponse } from '../types';
 
 import { HttpRequest } from './http-request';
 
@@ -9,10 +9,10 @@ export class QuorumApi {
     private config: FunctionConfig,
     logger: LoggerInterface,
   ) {
-    this.httpRequest = new HttpRequest(config, logger);
+    this.httpRequest = new HttpRequest(config, logger, { nonRetirableStatusCodes: [500, 503] });
   }
 
-  verifyMemberExists(idValue: string): Promise<UnknownResponse> {
+  verifyMemberExists(idValue: string): Promise<HttpResponse<UnknownResponse>> {
     const headers = new Headers();
     headers.append('Content-Type', 'application/json');
     headers.append('X-GVA-API-Key', this.config.quorumConfig.quorumApiHeader);
@@ -35,7 +35,7 @@ export class QuorumApi {
     const url = `${this.config.quorumConfig.quorumApiDomain}/auth/pin`;
     return this.httpRequest.fetchWithRetry<UnknownResponse>(url, requestOptions, 'verifyMemberExists');
   }
-  verifyMemberPin(idValue: string, pin: string): Promise<UnknownResponse> {
+  verifyMemberPin(idValue: string, pin: string): Promise<HttpResponse<UnknownResponse>> {
     const headers = new Headers();
     headers.append('Content-Type', 'application/json');
     headers.append('X-GVA-API-Key', this.config.quorumConfig.quorumApiHeader);

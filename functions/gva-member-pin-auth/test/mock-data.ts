@@ -67,7 +67,7 @@ export const expectedValidConfig = {
     invalidMemberNumber: validEnv.GOAL_INVALID_MEMBER_NUMBER,
     invalidPin: validEnv.GOAL_INVALID_PIN,
     needToAuthentication: validEnv.GOAL_NEED_TO_AUTHENTICATION,
-    pinattemptsexceeded: validEnv.GOAL_PIN_ATTEMPTS_EXCEEDED,
+    pinAttemptExceeded: validEnv.GOAL_PIN_ATTEMPTS_EXCEEDED,
     successfullyVerifiesMemberNumberAndPin: validEnv.GOAL_SUCCESSFULLY_VERIFIES_MEMBER_NUMBER_AND_PIN,
     transferToLiveOperator: validEnv.GOAL_TRANSFER_TO_LIVE_OPERATOR,
     zeroPress: validEnv.GOAL_ZERO_PRESS,

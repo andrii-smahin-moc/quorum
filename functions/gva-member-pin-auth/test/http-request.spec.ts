@@ -3,161 +3,124 @@ import { HttpRequest } from '../src/apis/http-request';
 import { expectedValidConfig } from './mock-data';
 import type { LoggerInterface } from '../src/types';
 
-vi.mock('../src/data-dog-api', () => ({
-  dataDogMetric: vi.fn(),
-}));
+vi.mock('../src/apis/data-dog-api', () => ({ dataDogMetric: vi.fn() }));
 
 const mockedFetch = vi.fn();
-
 const mockedLogger: LoggerInterface = {
   info: vi.fn().mockResolvedValue(undefined),
   error: vi.fn().mockResolvedValue(undefined),
   warn: vi.fn().mockResolvedValue(undefined),
 };
 
-describe('HttpRequest.fetchWithRetry', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+describe('HttpRequest (optimized, type-safe)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const base = new HttpRequest(expectedValidConfig, mockedLogger, {}, mockedFetch);
+
+  const jsonResponse = (body: any, ok = true, status = 200) => ({
+    ok,
+    status,
+    headers: new Headers({ 'content-type': 'application/json' }),
+    text: async () => JSON.stringify(body),
   });
 
-  const httpRequest = new HttpRequest(expectedValidConfig, mockedLogger, mockedFetch);
-
-  it('returns JSON on success (application/json)', async () => {
-    const body = JSON.stringify({ status: 'ok' });
+  it('should handle success, empty, and text responses', async () => {
+    mockedFetch.mockResolvedValueOnce(jsonResponse({ status: 'ok' }));
+    const ok = await base.fetchWithRetry('ok', {}, 'fn');
+    expect(ok.ok).toBe(true);
+    expect(ok.statusCode).toBe(200);
+    expect(ok.payload).toEqual({ status: 'ok' });
 
     mockedFetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
-      headers: new Headers({
-        'content-type': 'application/json',
-        'content-length': `${body.length}`,
-      }),
-      text: async () => body,
-    });
-
-    const result = await httpRequest.fetchWithRetry(
-      'https://api.example/success-json',
-      { headers: new Headers({ 'content-type': 'application/json' }) },
-      'testFunction',
-    );
-
-    expect(result).toEqual({ status: 'ok' });
-    expect(mockedFetch).toHaveBeenCalledTimes(1);
-  });
-
-  it('returns true on success with empty body / no declared content', async () => {
-    mockedFetch.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      headers: new Headers({
-        'content-type': 'application/json',
-        'content-length': '0',
-      }),
+      headers: new Headers({ 'content-type': 'application/json', 'content-length': '0' }),
       text: async () => '',
     });
-
-    const result = await httpRequest.fetchWithRetry(
-      'https://api.example/success-empty',
-      { headers: new Headers({ 'content-type': 'application/json' }) },
-      'testFunction',
-    );
-
-    expect(result).toBe(true);
-    expect(mockedFetch).toHaveBeenCalledTimes(1);
-  });
-
-  it('returns raw text on success when content-type is text/plain', async () => {
-    const body = 'hello world';
-    mockedFetch.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      headers: new Headers({
-        'content-type': 'text/plain; charset=utf-8',
-        'content-length': `${body.length}`,
-      }),
-      text: async () => body,
-    });
-
-    const result = await httpRequest.fetchWithRetry('https://api.example/success-text', { headers: new Headers() }, 'testFunction');
-
-    expect(result).toBe('hello world');
-    expect(mockedFetch).toHaveBeenCalledTimes(1);
-  });
-
-  it('throws for 4xx (except 429) without retries and logs error', async () => {
-    const body = JSON.stringify({ error: 'bad' });
-    mockedFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 400,
-      headers: new Headers({
-        'content-type': 'application/json',
-        'content-length': `${body.length}`,
-      }),
-      text: async () => body,
-    });
-
-    await expect(httpRequest.fetchWithRetry('https://api.example/fail-400', { headers: new Headers() }, 'testFunction')).rejects.toThrow(
-      'testFunction error! Status: 400',
-    );
-
-    expect(mockedFetch).toHaveBeenCalledTimes(1);
-    expect(mockedLogger.error).toHaveBeenCalled();
-  });
-
-  it('retries on 429 and eventually succeeds', async () => {
-    const failBody = JSON.stringify({ status: 'busy' });
-    const okBody = JSON.stringify({ status: 'ok' });
-
-    mockedFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 429,
-      headers: new Headers({
-        'content-type': 'application/json',
-        'content-length': `${failBody.length}`,
-      }),
-      text: async () => failBody,
-    });
+    const empty = await base.fetchWithRetry('empty', {}, 'fn');
+    expect(empty.ok).toBe(true);
+    expect(empty.payload).toBeNull();
 
     mockedFetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
-      headers: new Headers({
-        'content-type': 'application/json',
-        'content-length': `${okBody.length}`,
-      }),
-      text: async () => okBody,
+      headers: new Headers({}),
+      text: async () => 'plain text',
     });
+    const text = await base.fetchWithRetry('text', {}, 'fn');
+    expect(text.ok).toBe(true);
+    expect(text.payload).toBe('plain text');
+  });
 
-    const result = await httpRequest.fetchWithRetry(
-      'https://api.example/retry-then-ok',
-      { headers: new Headers({ 'content-type': 'application/json' }) },
-      'testFunction',
-    );
+  it('should handle client (400) and server (5xx) errors properly', async () => {
+    mockedFetch.mockResolvedValueOnce(jsonResponse({ status: 'error' }, false, 400));
+    const bad = await base.fetchWithRetry('bad', {}, 'fn');
+    expect(bad.ok).toBe(false);
+    expect(bad.statusCode).toBe(400);
+    expect(bad.payload).toBeNull();
 
-    expect(result).toEqual({ status: 'ok' });
+    mockedFetch.mockResolvedValue(jsonResponse({ error: 'server down' }, false, 503));
+    const srv = await base.fetchWithRetry('srv', {}, 'fn');
+    expect(srv.ok).toBe(false);
+    expect(srv.statusCode).toBe(503);
+    expect(srv.payload).toBeNull();
+  });
+
+  it('should retry once on 429 and then succeed', async () => {
+    const fail = { status: 'busy' };
+    const ok = { status: 'ok' };
+
+    mockedFetch.mockResolvedValueOnce(jsonResponse(fail, false, 429)).mockResolvedValueOnce(jsonResponse(ok, true, 200));
+
+    const res = await base.fetchWithRetry('retry', {}, 'fn');
+    expect(res.ok).toBe(true);
+    expect(res.statusCode).toBe(200);
     expect(mockedFetch).toHaveBeenCalledTimes(2);
   });
 
-  it('throws after max retries on 429 and logs final failure', async () => {
-    const failBody = JSON.stringify({ status: 'fail' });
+  it('should stop retry early for non-retirable status code', async () => {
+    const fail = { status: 'service unavailable' };
+    const inst = new HttpRequest(expectedValidConfig, mockedLogger, { nonRetirableStatusCodes: [503] }, mockedFetch);
 
-    mockedFetch.mockResolvedValue({
-      ok: false,
-      status: 429,
-      headers: new Headers({
-        'content-type': 'application/json',
-        'content-length': `${failBody.length}`,
-      }),
-      text: async () => failBody,
+    mockedFetch.mockResolvedValueOnce(jsonResponse(fail, false, 503));
+
+    const res = await inst.fetchWithRetry('no-retry', {}, 'fn');
+    expect(res.ok).toBe(false);
+    expect(res.statusCode).toBe(503);
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('should handle thrown network errors and final retry fallback', async () => {
+    mockedFetch.mockRejectedValue(new Error('ECONNRESET'));
+    const res = await base.fetchWithRetry('net', {}, 'fn');
+    expect(res.ok).toBe(false);
+    expect(res.payload).toBeNull();
+    expect(res.statusCode).toBe(500);
+    expect(mockedLogger.error).toHaveBeenCalled();
+  });
+
+  it('should handle aborted request gracefully', async () => {
+    const abortErr = new Error('aborted manually');
+    abortErr.name = 'AbortError';
+    mockedFetch.mockRejectedValueOnce(abortErr);
+
+    const res = await base.fetchWithRetry('abort', {}, 'fn');
+    expect(res.ok).toBe(false);
+    expect(res.statusCode).toBe(500);
+    expect(res.payload).toBeNull();
+  });
+
+  it('should handle immediate sync throw (undefined lastError fallback)', async () => {
+    const singleRetryConfig = { ...expectedValidConfig, callRetries: 1 };
+    const req = new HttpRequest(singleRetryConfig, mockedLogger, {}, mockedFetch);
+
+    mockedFetch.mockImplementationOnce(() => {
+      throw new Error('Immediate failure');
     });
 
-    await expect(httpRequest.fetchWithRetry('https://api.example/always-429', {}, 'testFunction')).rejects.toThrow(
-      'Max retry attempts reached. Operation failed.',
-    );
-
-    expect(mockedFetch).toHaveBeenCalledTimes(expectedValidConfig.callRetries);
-    expect(mockedLogger.error).toHaveBeenCalledWith(
-      expect.stringContaining('Max retry attempts reached for function testFunction. Operation failed.'),
-    );
+    const res = await req.fetchWithRetry('sync', {}, 'fn');
+    expect(res.ok).toBe(false);
+    expect(res.payload).toBeNull();
+    expect(res.statusCode).toBe(500);
   });
 });

@@ -13,3 +13,8 @@ export const GVAFunctionPayloadSchema = v.object({
   messageType: v.union([v.literal('text'), v.literal('quickReplyTap')]),
   text: v.optional(v.string()),
 });
+
+export const GliaKVValueSchema = v.object({
+  key: v.string(),
+  value: v.nullable(v.string()),
+});

@@ -18,3 +18,7 @@ export interface HandlerResult {
 }
 
 export type GoalStepHandler = (context: HandlerPayload) => Promise<HandlerResult>;
+
+export interface IdentifierFailedAttemptsHistory {
+  failedAttempts: number[];
+}

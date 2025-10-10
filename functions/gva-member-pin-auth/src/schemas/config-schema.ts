@@ -21,6 +21,7 @@ export const BaseEnvironmentSchema = v.object({
   GOAL_SUCCESSFULLY_VERIFIES_MEMBER_NUMBER_AND_PIN: v.string(),
   GOAL_TRANSFER_TO_LIVE_OPERATOR: v.string(),
   GOAL_ZERO_PRESS: v.string(),
+  INPUT_VALIDATION_FAILED_ATTEMPTS: v.string(),
   IS_DEV_MOD: v.optional(v.string()),
   PROMPT_DETECT_CONFIDENCE: v.string(),
   PROMPT_OPTION_DETECTOR: v.string(),

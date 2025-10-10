@@ -16,26 +16,31 @@ vi.mock('../src/services/answer-detector-service', () => ({
   })),
 }));
 
-// --- Тепер SUT ---
+const kvFactory = {
+  initializeKvStore: vi.fn(() => ({
+    get: vi.fn(),
+    set: vi.fn().mockResolvedValue(undefined),
+  })),
+};
+
 import { GVAGoalService, GVAGoalSteps, AnswerOptionsList } from '../src/services/gva-goal-service';
 import type { HandlerPayload, LoggerInterface } from '../src/types';
 import { expectedValidConfig } from './mock-data';
 
-// --- Логер ---
 const logger: LoggerInterface = {
   info: vi.fn().mockResolvedValue(undefined),
   warn: vi.fn().mockResolvedValue(undefined),
   error: vi.fn().mockResolvedValue(undefined),
 };
 
-const makeService = () => new GVAGoalService(expectedValidConfig as any, logger);
+const makeService = () => new GVAGoalService(expectedValidConfig as any, logger, kvFactory as any);
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
 describe('GVAGoalService', () => {
-  it('initialStep → ставить STEP=VALIDATE_MEMBER_NUMBER і returns needToAuthentication', async () => {
+  it('initialStep → ставити STEP=VALIDATE_MEMBER_NUMBER і returns needToAuthentication', async () => {
     const service = makeService();
     const ctx: HandlerPayload = {
       engagementId: 'e1',
@@ -238,7 +243,7 @@ describe('GVAGoalService', () => {
     });
   });
 
-  it('validatePin → invalid PIN with exided limit  → final pinAttemptsExceeded', async () => {
+  it('validatePin → invalid PIN with exided limit  → final pinAttemptExceeded', async () => {
     const service = makeService();
     detectMock.mockResolvedValueOnce(null);
 
@@ -258,6 +263,6 @@ describe('GVAGoalService', () => {
     const res = await service.validatePin(ctx);
 
     expect(res.isFinalStep).toBe(true);
-    expect(res.responseId).toBe(expectedValidConfig.gvaGoals.pinattemptsexceeded);
+    expect(res.responseId).toBe(expectedValidConfig.gvaGoals.pinAttemptExceeded);
   });
 });

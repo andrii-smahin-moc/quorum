@@ -1,15 +1,16 @@
 import { CatalogErrors } from './catalog-errors';
 import { INITIAL_STEP } from './constants';
 import { GVAGoalService } from './services';
-import { BaseRequestPayload, FunctionConfig, LoggerInterface, ServiceResponse } from './types';
+import { BaseRequestPayload, FunctionConfig, KvStoreFactory, LoggerInterface, ServiceResponse } from './types';
 
 export class RequestHandler {
   private gvaGoalService: GVAGoalService;
   constructor(
     config: FunctionConfig,
     private logger: LoggerInterface,
+    kvStoreFactory: KvStoreFactory,
   ) {
-    this.gvaGoalService = new GVAGoalService(config, logger);
+    this.gvaGoalService = new GVAGoalService(config, logger, kvStoreFactory);
   }
   async handleRequest(requestPayload: BaseRequestPayload): Promise<ServiceResponse<unknown>> {
     const gvaPayload = this.gvaGoalService.parsePayload(requestPayload.payload);
@@ -18,16 +19,6 @@ export class RequestHandler {
       await this.logger.error(errorMessage);
       return { error: errorMessage, status: false };
     }
-    // async handleRequest(requestPayload: BaseRequestPayload): Promise<ServiceResponse<unknown>> {
-    //   const gvaPayload = this.gvaGoalService.parsePayload(requestPayload.payload);
-    //   if (!gvaPayload.status) {
-    //     const errorMessage = `${CatalogErrors.FAILED_GVA_PAYLOAD}: ${gvaPayload.message}`;
-    //     await this.logger.error(errorMessage);
-    //     return {
-    //       error: errorMessage,
-    //       status: false,
-    //     };
-    //   }
 
     let customJourneyContext: Record<string, unknown> = {};
     if (gvaPayload.output.customJourneyContext) {
@@ -45,8 +36,8 @@ export class RequestHandler {
       const result = await stepHandler(gvaPayload.output);
       // ✅ log rusults before sending the responce
       await this.logger.info(
-        `EngagementId: ${gvaPayload.output.engagementId}, 
-        GVA Step result: responseId=${result.responseId}, 
+        `EngagementId: ${gvaPayload.output.engagementId},
+        GVA Step result: responseId=${result.responseId},
         isFinalStep=${!!result.isFinalStep}`,
       );
       return {

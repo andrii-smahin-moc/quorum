@@ -3,8 +3,9 @@ import { validateConfig } from './config';
 import { LoggerWithDD } from './logger';
 import { RequestHandler } from './request-handler';
 import { validatePayload } from './request-validator';
+import { KvStoreFactory } from './types';
 
-export async function onInvoke(request: Request, environment: Record<string, unknown>) {
+export async function onInvoke(request: Request, environment: Record<string, unknown>, kvStoreFactory: KvStoreFactory) {
   const config = validateConfig(environment);
 
   if (!config.status) {
@@ -23,7 +24,7 @@ export async function onInvoke(request: Request, environment: Record<string, unk
     return Response.json({ error: errorMessage, status: false });
   }
 
-  const requestHandler = new RequestHandler(config.output, logger);
+  const requestHandler = new RequestHandler(config.output, logger, kvStoreFactory);
   const result = await requestHandler.handleRequest(validatedPayload.output);
   await logger.info('--------Request processed---------');
 
