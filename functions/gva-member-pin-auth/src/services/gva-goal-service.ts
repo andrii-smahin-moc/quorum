@@ -87,11 +87,18 @@ export class GVAGoalService extends BaseGVAGoalService {
     await this.logger.info(`EngagementId: ${context.engagementId}, Validating member number`);
 
     const detectedAnswer = await this.answerDetectorService.detect(context);
+    // NEW
+    const exitHandled = await this.handleMemberExitOption(context, detectedAnswer ?? undefined);
+    if (exitHandled) {
+      return exitHandled;
+    }
+
     const customJourneyContext = this.getCustomJourneyContext(context);
 
     let failedAttempts = Number(customJourneyContext.failedAttempts ?? 0);
 
     if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.ZERO_NUMBER) {
+      await this.handleMemberExitOption(context, detectedAnswer);
       await this.logger.info(`EngagementId: ${context.engagementId}, Zero press detected`);
       await this.tryToTransferToQueue(context.engagementId);
       return this.buildHandlerResultPayload({
@@ -101,6 +108,7 @@ export class GVAGoalService extends BaseGVAGoalService {
     }
 
     if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.MEMBER_NUMBER && detectedAnswer.matchedText) {
+      await this.handleMemberExitOption(context, detectedAnswer);
       await this.logger.info(`EngagementId: ${context.engagementId}, Valid member number received: ${detectedAnswer.matchedText}`);
 
       const failedAttempts = await this.getFailedAttempts(detectedAnswer.matchedText);
@@ -116,6 +124,7 @@ export class GVAGoalService extends BaseGVAGoalService {
       }
 
       const isMemberExistsResponse = await this.verifyIsMemberExists(detectedAnswer.matchedText);
+      await this.handleMemberExitOption(context, detectedAnswer ?? undefined);
 
       if (isMemberExistsResponse && isMemberExistsResponse.statusCode === 503) {
         // update it and start OTP flow
@@ -127,6 +136,7 @@ export class GVAGoalService extends BaseGVAGoalService {
 
       if (isMemberExistsResponse && isMemberExistsResponse.ok) {
         customJourneyContext.memberNumber = detectedAnswer.matchedText;
+        await this.handleMemberExitOption(context, detectedAnswer);
         customJourneyContext.failedAttempts = 0;
         customJourneyContext.STEP = GVAGoalSteps.VALIDATE_PIN;
         return this.buildHandlerResultPayload({
@@ -162,6 +172,12 @@ export class GVAGoalService extends BaseGVAGoalService {
     await this.logger.info(`EngagementId: ${context.engagementId}, Validating PIN`);
 
     const detectedAnswer = await this.answerDetectorService.detect(context);
+    // NEW
+    const exitHandled = await this.handleMemberExitOption(context, detectedAnswer ?? undefined);
+    if (exitHandled) {
+      return exitHandled;
+    }
+
     const customJourneyContext = this.getCustomJourneyContext(context);
 
     const memberNumber = this.getMemberNumberFromContext(customJourneyContext);
@@ -186,9 +202,11 @@ export class GVAGoalService extends BaseGVAGoalService {
     }
 
     if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.MEMBER_PIN && detectedAnswer.matchedText) {
+      await this.handleMemberExitOption(context, detectedAnswer);
       await this.logger.info(`EngagementId: ${context.engagementId}, Valid PIN received: ${detectedAnswer.matchedText}`);
 
       const authResultResponse = await this.verifyMemberPin(memberNumber, detectedAnswer.matchedText);
+      await this.handleMemberExitOption(context, detectedAnswer);
       if (
         authResultResponse &&
         authResultResponse.ok &&
@@ -210,6 +228,7 @@ export class GVAGoalService extends BaseGVAGoalService {
       }
     }
     if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.FORGET_THE_PIN) {
+      await this.handleMemberExitOption(context, detectedAnswer);
       await this.logger.info(`EngagementId: ${context.engagementId}, User forgot PIN`);
       return this.buildHandlerResultPayload({
         isFinalStep: true,
@@ -294,6 +313,22 @@ export class GVAGoalService extends BaseGVAGoalService {
       return null;
     }
   }
+  private async handleMemberExitOption(
+    context: HandlerPayload,
+    detectedAnswer?: { matchedText?: string | null; name?: string },
+  ): Promise<HandlerResult | null> {
+    if (!detectedAnswer || detectedAnswer.name !== AnswerOptionsList.MEMBER_EXIT_OPTION) {
+      return null;
+    }
+
+    await this.logger.info(`EngagementId: ${context.engagementId}, Exit option detected (${detectedAnswer.matchedText ?? ''})`);
+    await this.tryToTransferToQueue(context.engagementId);
+
+    return this.buildHandlerResultPayload({
+      isFinalStep: true,
+      responseId: this.config.gvaGoals.transferToLiveOperator,
+    });
+  }
 
   private async resetFailedAttemptsHistory(identifier: string): Promise<void> {
     await this.saveToKvStore(identifier, JSON.stringify({ failedAttempts: [] }));
@@ -309,7 +344,6 @@ export class GVAGoalService extends BaseGVAGoalService {
     await this.saveToKvStore(memberNumber, JSON.stringify({ failedAttempts }));
     return failedAttempts;
   }
-
   private async saveToKvStore(engagementId: string, value: string): Promise<boolean> {
     try {
       await this.gliaKVService.setValue(engagementId, value);
