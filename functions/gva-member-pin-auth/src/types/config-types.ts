@@ -12,7 +12,7 @@ export interface DataDogConfig {
 
 export interface GliaConfig {
   apiDomain: string;
-  gliaLiveOperatorQueue: string;
+  liveOperatorQueueID: string;
   siteId: string;
   userApiKey: string;
   userApiKeySecret: string;
@@ -26,9 +26,9 @@ export interface GVAGoals {
   invalidMemberNumber: string;
   invalidPin: string;
   forgotPin: string;
+  transferToLiveOperator: string;
   zeroPress: string;
   pinAttemptExceeded: string;
-  transferToLiveOperator: string;
 }
 
 export interface GliaAIConfig {

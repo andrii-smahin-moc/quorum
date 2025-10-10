@@ -1,4 +1,5 @@
-import { QuorumApi } from '../apis';
+import { GliaAuthApi, QuorumApi } from '../apis';
+import { GliaTransferApi } from '../apis/glia-transfer-api';
 import { INITIAL_STEP, MEMBER_NUMBER_REGEX, MEMBER_PIN_REGEX, ZERO_NUMBER } from '../constants';
 import { GliaKVValueSchema } from '../schemas';
 import { FunctionConfig, HandlerPayload, HandlerResult, IdentifierFailedAttemptsHistory, KvStoreFactory, LoggerInterface } from '../types';
@@ -16,6 +17,7 @@ export enum GVAGoalSteps {
 
 export const AnswerOptionsList = {
   FORGET_THE_PIN: 'forget_the_pin',
+  MEMBER_EXIT_OPTION: 'member_exit',
   MEMBER_NUMBER: 'member_number',
   MEMBER_PIN: 'member_pin',
   ZERO_NUMBER: 'zero_number',
@@ -23,7 +25,9 @@ export const AnswerOptionsList = {
 
 export class GVAGoalService extends BaseGVAGoalService {
   private answerDetectorService: AnswerDetectorService;
+  private gliaAuthApi: GliaAuthApi;
   private gliaKVService: GliaKVService;
+  private gliaTransferApi: GliaTransferApi;
   private quorumApi: QuorumApi;
 
   constructor(
@@ -32,8 +36,10 @@ export class GVAGoalService extends BaseGVAGoalService {
     kvStoreFactory: KvStoreFactory,
   ) {
     super();
+    this.gliaAuthApi = new GliaAuthApi(config, logger);
     this.quorumApi = new QuorumApi(config, logger);
     this.gliaKVService = new GliaKVService(config, logger, kvStoreFactory);
+    this.gliaTransferApi = new GliaTransferApi(config, logger);
     this.register(INITIAL_STEP, this.initialStep.bind(this));
     this.register(GVAGoalSteps.VALIDATE_MEMBER_NUMBER, this.validateMemberNumber.bind(this));
     this.register(GVAGoalSteps.VALIDATE_PIN, this.validatePin.bind(this));
@@ -43,6 +49,26 @@ export class GVAGoalService extends BaseGVAGoalService {
       new AnswerOption(AnswerOptionsList.MEMBER_NUMBER, [MEMBER_NUMBER_REGEX]),
       new AnswerOption(AnswerOptionsList.MEMBER_PIN, [MEMBER_PIN_REGEX]),
       new AnswerOption(AnswerOptionsList.ZERO_NUMBER, [ZERO_NUMBER, 'zero']),
+      new AnswerOption(AnswerOptionsList.MEMBER_EXIT_OPTION, [
+        'exit',
+        'quit',
+        'finish',
+        'end',
+        'cancel',
+        'abort',
+        'nevermind',
+        'never mind',
+        'stop',
+        'bye',
+        'goodbye',
+        'main menu',
+        'menu',
+        'back',
+        'go back',
+        'start over',
+        'restart',
+        'begin',
+      ]),
     ]);
   }
 
@@ -67,6 +93,7 @@ export class GVAGoalService extends BaseGVAGoalService {
 
     if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.ZERO_NUMBER) {
       await this.logger.info(`EngagementId: ${context.engagementId}, Zero press detected`);
+      await this.tryToTransferToQueue(context.engagementId);
       return this.buildHandlerResultPayload({
         isFinalStep: true,
         responseId: this.config.gvaGoals.zeroPress,
@@ -81,7 +108,7 @@ export class GVAGoalService extends BaseGVAGoalService {
         await this.logger.info(
           `EngagementId: ${context.engagementId}, Member number ${detectedAnswer.matchedText} has too many failed attempts`,
         );
-        // transfer to live operator
+        await this.tryToTransferToQueue(context.engagementId);
         return this.buildHandlerResultPayload({
           isFinalStep: true,
           responseId: this.config.gvaGoals.transferToLiveOperator,
@@ -116,6 +143,7 @@ export class GVAGoalService extends BaseGVAGoalService {
 
     if (failedAttempts >= attemptLimit) {
       await this.logger.info(`EngagementId: ${context.engagementId}, Too many failed attempts`);
+      await this.tryToTransferToQueue(context.engagementId);
       return this.buildHandlerResultPayload({
         isFinalStep: true,
         responseId: this.config.gvaGoals.transferToLiveOperator,
@@ -124,7 +152,6 @@ export class GVAGoalService extends BaseGVAGoalService {
 
     await this.logger.info(`EngagementId: ${context.engagementId}, Invalid member number`);
     customJourneyContext.STEP = GVAGoalSteps.VALIDATE_MEMBER_NUMBER;
-
     return this.buildHandlerResultPayload({
       customJourneyContext,
       responseId: this.config.gvaGoals.invalidMemberNumber,
@@ -141,6 +168,7 @@ export class GVAGoalService extends BaseGVAGoalService {
 
     if (!memberNumber) {
       await this.logger.error(`EngagementId: ${context.engagementId}, memberNumber is missing or invalid in customJourneyContext`);
+      await this.tryToTransferToQueue(context.engagementId);
       return this.buildHandlerResultPayload({
         isFinalStep: true,
         responseId: this.config.gvaGoals.invalidMemberNumber,
@@ -150,7 +178,7 @@ export class GVAGoalService extends BaseGVAGoalService {
     const failedAttempts = await this.getFailedAttempts(memberNumber);
     if (failedAttempts.length >= this.config.inputValidationFailedAttemptsLimit) {
       await this.logger.info(`EngagementId: ${context.engagementId}, Member number ${memberNumber} has too many failed attempts`);
-      // transfer to live operator
+      await this.tryToTransferToQueue(context.engagementId);
       return this.buildHandlerResultPayload({
         isFinalStep: true,
         responseId: this.config.gvaGoals.transferToLiveOperator,
@@ -198,7 +226,7 @@ export class GVAGoalService extends BaseGVAGoalService {
         `EngagementId: ${context.engagementId}, Exceeded allowed PIN attempts ` +
           `(${newFailedAttempts.length}/${attemptLimit}), escalating`,
       );
-
+      await this.tryToTransferToQueue(context.engagementId);
       return this.buildHandlerResultPayload({
         isFinalStep: true,
         responseId: this.config.gvaGoals.pinAttemptExceeded,
@@ -216,6 +244,20 @@ export class GVAGoalService extends BaseGVAGoalService {
       },
       responseId: this.config.gvaGoals.invalidPin,
     });
+  }
+
+  private async fetchAuthToken() {
+    try {
+      const authResponse = await this.gliaAuthApi.fetchUserBearerToken();
+      if (authResponse.ok && authResponse.payload.token) {
+        return authResponse.payload.token;
+      }
+      return null;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error in fetchAuthToken';
+      await this.logger.error(`Error fetching auth token: ${message}`);
+      return null;
+    }
   }
 
   private getCustomJourneyContext(context: HandlerPayload) {
@@ -278,7 +320,22 @@ export class GVAGoalService extends BaseGVAGoalService {
       return false;
     }
   }
+  private async tryToTransferToQueue(engagementId: string) {
+    const token = await this.fetchAuthToken();
+    if (!token) {
+      await this.logger.error(`EngagementId: ${engagementId}, Unable to fetch auth token for transferToQueue`);
+      return;
+    }
+    try {
+      const result = await this.gliaTransferApi.transferToQueue(token, engagementId);
+      await this.logger.info(`EngagementId: ${engagementId}, Transfer to queue result: ${result.statusCode}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error in tryToTransferToQueue';
+      await this.logger.error(`EngagementId: ${engagementId}, Error transferring to queue: ${message}`);
+    }
 
+    return;
+  }
   private async verifyIsMemberExists(memberNumber: string) {
     try {
       return await this.quorumApi.verifyMemberExists(memberNumber);

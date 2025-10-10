@@ -25,6 +25,7 @@ export function validateConfig(environment: Record<string, unknown>): Validation
       },
       glia: {
         apiDomain: validationResult.output.GLIA_API_DOMAIN,
+        liveOperatorQueueID: validationResult.output.GLIA_LIVE_OPERATOR_QUEUE,
         siteId: validationResult.output.SITE_ID,
         userApiKey: validationResult.output.GLIA_USER_API_KEY,
         userApiKeySecret: validationResult.output.GLIA_USER_API_KEY_SECRET,
@@ -49,7 +50,6 @@ export function validateConfig(environment: Record<string, unknown>): Validation
         alreadyAuthenticated: validationResult.output.GOAL_ALREADY_AUTHENTICATED,
         enterAPin: validationResult.output.GOAL_ENTER_A_PIN,
         forgotPin: validationResult.output.GOAL_FORGOT_PIN,
-        gliaLiveOperatorQueue: validationResult.output.GLIA_LIVE_OPERATOR_QUEUE,
         invalidMemberNumber: validationResult.output.GOAL_INVALID_MEMBER_NUMBER,
         invalidPin: validationResult.output.GOAL_INVALID_PIN,
         needToAuthentication: validationResult.output.GOAL_NEED_TO_AUTHENTICATION,

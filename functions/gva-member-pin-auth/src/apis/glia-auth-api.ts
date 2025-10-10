@@ -1,4 +1,4 @@
-import type { FunctionConfig, GliaConfig, LoggerInterface } from '../types';
+import type { FunctionConfig, GliaConfig, HttpResponse, LoggerInterface } from '../types';
 
 import { HttpRequest } from './http-request';
 
@@ -16,7 +16,7 @@ export class GliaAuthApi {
     this.httpRequest = new HttpRequest(config, logger);
   }
 
-  async fetchUserBearerToken(): Promise<string> {
+  async fetchUserBearerToken(): Promise<HttpResponse<UserTokenResponse>> {
     const headers = new Headers();
     headers.append('Content-Type', 'application/json');
     headers.append('Accept', 'application/vnd.salemove.v1+json');
@@ -33,7 +33,6 @@ export class GliaAuthApi {
     };
 
     const url = `${this.gliaConfig.apiDomain}/operator_authentication/tokens`;
-    const result = await this.httpRequest.fetchWithRetry<UserTokenResponse>(url, requestOptions, 'fetchUserBearerToken');
-    return result.token;
+    return this.httpRequest.fetchWithRetry<UserTokenResponse>(url, requestOptions, 'fetchUserBearerToken');
   }
 }
