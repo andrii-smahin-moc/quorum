@@ -23,12 +23,16 @@ export interface GVAGoals {
   alreadyAuthenticated: string;
   successfullyVerifiesMemberNumberAndPin: string;
   enterAPin: string;
+  enterOTPCode: string;
   invalidMemberNumber: string;
   invalidPin: string;
   forgotPin: string;
   transferToLiveOperator: string;
   zeroPress: string;
   pinAttemptExceeded: string;
+  otpflowstart: string;
+  invalidotpidentifier: string;
+  invalidotp: string;
 }
 
 export interface GliaAIConfig {
