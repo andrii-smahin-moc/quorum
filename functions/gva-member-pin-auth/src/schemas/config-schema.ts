@@ -33,6 +33,7 @@ export const BaseEnvironmentSchema = v.object({
   PROMPT_OPTION_DETECTOR: v.string(),
   QUORUM_API_DOMAIN: v.string(),
   QUORUM_API_HEADER: v.string(),
+  QUORUM_DEFAULT_PIN: v.optional(v.string()),
   REQUEST_TIMEOUT: v.optional(v.string()),
   RETRY_DELAY: v.optional(v.string()),
   SITE_ID: v.string(),

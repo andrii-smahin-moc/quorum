@@ -47,6 +47,7 @@ export interface GliaAIConfig {
 export interface QuorumConfig {
   quorumApiDomain: string;
   quorumApiHeader: string;
+  defaultPin: string;
   otpIdentifierType: string;
 }
 

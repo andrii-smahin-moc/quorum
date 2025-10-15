@@ -13,7 +13,6 @@ import { AnswerOption } from './possible-answer';
 export enum GVAGoalSteps {
   VALIDATE_MEMBER_NUMBER = 'VALIDATE_MEMBER_NUMBER',
   VALIDATE_OTP_CODE = 'VALIDATE_OTP_CODE',
-  // NEW (OTP)
   VALIDATE_OTP_IDENTIFIER = 'VALIDATE_OTP_IDENTIFIER',
   VALIDATE_PIN = 'VALIDATE_PIN',
 }
@@ -24,7 +23,6 @@ export const AnswerOptionsList = {
   MEMBER_NUMBER: 'member_number',
   MEMBER_PIN: 'member_pin',
   OTP_CODE: 'otp_code',
-  // NEW (OTP)
   OTP_IDENTIFIER: 'otp_identifier',
   ZERO_NUMBER: 'zero_number',
 };
@@ -50,7 +48,6 @@ export class GVAGoalService extends BaseGVAGoalService {
     this.register(INITIAL_STEP, this.initialStep.bind(this));
     this.register(GVAGoalSteps.VALIDATE_MEMBER_NUMBER, this.validateMemberNumber.bind(this));
     this.register(GVAGoalSteps.VALIDATE_PIN, this.validatePin.bind(this));
-    // NEW (OTP)
     this.register(GVAGoalSteps.VALIDATE_OTP_IDENTIFIER, this.validateOtpIdentifier.bind(this));
     this.register(GVAGoalSteps.VALIDATE_OTP_CODE, this.validateOtpCode.bind(this));
 
@@ -59,7 +56,6 @@ export class GVAGoalService extends BaseGVAGoalService {
       new AnswerOption(AnswerOptionsList.MEMBER_NUMBER, [IDENTIFIER_REGEX]),
       new AnswerOption(AnswerOptionsList.MEMBER_PIN, [MEMBER_PIN_REGEX]),
       new AnswerOption(AnswerOptionsList.ZERO_NUMBER, [ZERO_NUMBER, 'zero']),
-      // NEW (OTP) — performing detection but validate with straight regex text below
       new AnswerOption(AnswerOptionsList.OTP_IDENTIFIER, [IDENTIFIER_REGEX]),
       new AnswerOption(AnswerOptionsList.OTP_CODE, [OTP_CODE_REGEX]),
       new AnswerOption(AnswerOptionsList.MEMBER_EXIT_OPTION, [
@@ -143,7 +139,7 @@ export class GVAGoalService extends BaseGVAGoalService {
           responseData: {
             identifierType: this.config.quorumConfig.otpIdentifierType,
           },
-          responseId: this.config.gvaGoals.otpflowstart, // GOAL_OTP_FLOW_START
+          responseId: this.config.gvaGoals.otpflowstart,
         });
       }
 
@@ -178,49 +174,6 @@ export class GVAGoalService extends BaseGVAGoalService {
     });
   }
 
-  // // NEW — VALIDATE_OTP_CODE step
-  // async validateOtpCode(context: HandlerPayload): Promise<HandlerResult> {
-  //   await this.logger.info(`EngagementId: ${context.engagementId}, Validating OTP code`);
-
-  //   const detectedAnswer = await this.answerDetectorService.detect(context);
-  //   const exitHandled = await this.handleMemberExitOption(context, detectedAnswer ?? undefined);
-  //   if (exitHandled) {
-  //     return exitHandled;
-  //   }
-
-  //   const customJourneyContext = this.getCustomJourneyContext(context);
-
-  //   const attemptLimit = this.config.inputValidationFailedAttemptsLimit;
-  //   const previousAttempts = await this.getFailedIdentifierVerifyAttempts(otpAttemptsKey);
-
-  //   // Invalid OTP > Increment atempt and show the invalidotp
-  //   const newAttempts = await this.saveFailedAttempt(otpAttemptsKey, previousAttempts);
-
-  //   if (newAttempts.length >= attemptLimit) {
-  //     await this.logger.info(
-  //       `EngagementId: ${context.engagementId}, Exceeded allowed OTP attempts (${newAttempts.length}/${attemptLimit}), escalating`,
-  //     );
-  //     await this.tryToTransferToQueue(context.engagementId);
-  //     return this.buildHandlerResultPayload({
-  //       isFinalStep: true,
-  //       responseId: this.config.gvaGoals.transferToLiveOperator,
-  //     });
-  //   }
-
-  //   customJourneyContext.STEP = GVAGoalSteps.VALIDATE_OTP_CODE;
-  //   customJourneyContext.otpAttemptNumber = newAttempts.length;
-  //   customJourneyContext.otpAttemptLimit = attemptLimit;
-
-  //   return this.buildHandlerResultPayload({
-  //     customJourneyContext,
-  //     responseData: {
-  //       otpAttemptLimit: attemptLimit,
-  //       otpAttemptNumber: newAttempts.length,
-  //     },
-  //     responseId: this.config.gvaGoals.invalidotp, // GOAL_INVALID_OTP
-  //   });
-  // }
-  // NEW — VALIDATE_OTP_CODE step (PIN-like, but without FORGET option)
   async validateOtpCode(context: HandlerPayload): Promise<HandlerResult> {
     await this.logger.info(`EngagementId: ${context.engagementId}, Validating OTP code`);
 
@@ -232,37 +185,31 @@ export class GVAGoalService extends BaseGVAGoalService {
 
     const customJourneyContext = this.getCustomJourneyContext(context);
 
-    // 1) should have an otpIdentifier from prev step (VALIDATE_OTP_IDENTIFIER)
     const otpIdentifier = typeof customJourneyContext.otpIdentifier === 'string' ? customJourneyContext.otpIdentifier : null;
     if (!otpIdentifier) {
       await this.logger.error(`EngagementId: ${context.engagementId}, otpIdentifier is missing before OTP code validation`);
-      // getting back visitor to the step to enter OTP identifier
       customJourneyContext.STEP = GVAGoalSteps.VALIDATE_OTP_IDENTIFIER;
       return this.buildHandlerResultPayload({
         customJourneyContext,
         responseData: {
           identifierType: this.config.quorumConfig.otpIdentifierType,
         },
-        responseId: this.config.gvaGoals.invalidotpidentifier, // "Your answer is wrong, enter valid {{identifierType}}"
+        responseId: this.config.gvaGoals.invalidotpidentifier,
       });
     }
 
-    // 2) Limit + story of attempts for OTP code (separate key for KV, do not mess with PIN)
     const attemptLimit = this.config.inputValidationFailedAttemptsLimit;
     const previousFailedAttempts = await this.getFailedIdentifierVerifyAttempts(otpIdentifier);
 
-    // 3) IF we get the valid 6th digits code — check on a backend
     if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.OTP_CODE && detectedAnswer.matchedText) {
       const verifyResponse = await this.verifyOtpCode(otpIdentifier, detectedAnswer.matchedText);
 
-      // 3) IF we get the valid 6th digits code — check on a backend
       if (
         verifyResponse &&
         verifyResponse.ok &&
         typeof verifyResponse.payload.token === 'string' &&
-        typeof verifyResponse.payload.expiresIn === 'string'
+        String(verifyResponse.payload.expiresIn)
       ) {
-        // success > reset attempts and show the success goal
         await this.resetFailedAttemptsHistory(detectedAnswer.matchedText);
 
         const expiresIn =
@@ -281,7 +228,6 @@ export class GVAGoalService extends BaseGVAGoalService {
       }
     }
 
-    // 4) Invalid format or not success of backend check increment attempt
     const newAttempts = await this.saveIdentifierFailedAttempt(otpIdentifier, previousFailedAttempts);
 
     if (newAttempts.length >= attemptLimit) {
@@ -295,7 +241,6 @@ export class GVAGoalService extends BaseGVAGoalService {
       });
     }
 
-    // 5) Ask to repeat and show the attempt {{otpAttemptNumber}} of {{otpAttemptLimit}}
     customJourneyContext.STEP = GVAGoalSteps.VALIDATE_OTP_CODE;
 
     return this.buildHandlerResultPayload({
@@ -304,88 +249,10 @@ export class GVAGoalService extends BaseGVAGoalService {
         otpAttemptLimit: attemptLimit,
         otpAttemptNumber: newAttempts.length,
       },
-      responseId: this.config.gvaGoals.invalidotp, // GOAL_INVALID_OTP
+      responseId: this.config.gvaGoals.invalidotp,
     });
   }
 
-  // NEW — VALIDATE_OTP_IDENTIFIER step
-  // async validateOtpIdentifier(context: HandlerPayload): Promise<HandlerResult> {
-  //   await this.logger.info(`DBG[${context.engagementId}] enter VALIDATE_OTP_IDENTIFIER`); // NEW LOG
-  //   await this.logger.info(`EngagementId: ${context.engagementId}, Validating OTP identifier`);
-  //   const detectedAnswer = await this.answerDetectorService.detect(context);
-  //   const isIdentifier = IDENTIFIER_REGEX.test((detectedAnswer?.matchedText ?? '').trim());
-  //   await this.logger.info(`DBG[${context.engagementId}] IDENTIFIER_REGEX=${isIdentifier}`);
-
-  //   await this.logger.info(
-  //     `DBG[${context.engagementId}] detect name=${detectedAnswer?.name ?? '∅'} text="${detectedAnswer?.matchedText ?? ''}"`,
-  //   ); // NEW LOG
-  //   const exitHandled = await this.handleMemberExitOption(context, detectedAnswer ?? undefined);
-  //   if (exitHandled) {
-  //     return exitHandled;
-  //   }
-
-  //   const customJourneyContext = this.getCustomJourneyContext(context);
-
-  //   if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.OTP_IDENTIFIER && detectedAnswer.matchedText) {
-  //     await this.logger.info(`EngagementId: ${context.engagementId}, Valid OTP identifier received: ${detectedAnswer.matchedText}`);
-
-  //     const failedAttempts = await this.getFailedIdentifierVerifyAttempts(detectedAnswer.matchedText);
-  //     if (failedAttempts.length >= this.config.inputValidationFailedAttemptsLimit) {
-  //       await this.logger.info(
-  //         `EngagementId: ${context.engagementId}, Member number ${detectedAnswer.matchedText} has too many failed attempts`,
-  //       );
-  //       await this.tryToTransferToQueue(context.engagementId);
-  //       return this.buildHandlerResultPayload({
-  //         isFinalStep: true,
-  //         responseId: this.config.gvaGoals.transferToLiveOperator,
-  //       });
-  //     }
-
-  //     const initAuthResponse = await this.initOtpAuthentication(detectedAnswer.matchedText);
-
-  //     if (initAuthResponse && initAuthResponse.ok) {
-  //       // on identifier owner device - OTP was sent
-
-  //       customJourneyContext.otpIdentifier = detectedAnswer.matchedText;
-  //       customJourneyContext.STEP = GVAGoalSteps.VALIDATE_OTP_CODE;
-
-  //       return this.buildHandlerResultPayload({
-  //         customJourneyContext,
-  //         responseId: this.config.gvaGoals.enterOTPCode, // GOAL_ENTER_OTP_CODE
-  //       });
-  //     }
-  //   }
-
-  //   let identifierFailedAttempts = Number(customJourneyContext.identifierFailedAttempts ?? 0);
-
-  //   const attemptLimit = this.config.inputValidationFailedAttemptsLimit;
-
-  //   identifierFailedAttempts += 1;
-
-  //   if (identifierFailedAttempts >= attemptLimit) {
-  //     await this.logger.info(
-  //       `EngagementId: ${context.engagementId},` +
-  //         ` Exceeded allowed OTP identifier attempts (${identifierFailedAttempts}/${attemptLimit}), escalating`,
-  //     );
-  //     await this.tryToTransferToQueue(context.engagementId);
-  //     return this.buildHandlerResultPayload({
-  //       isFinalStep: true,
-  //       responseId: this.config.gvaGoals.transferToLiveOperator,
-  //     });
-  //   }
-
-  //   customJourneyContext.STEP = GVAGoalSteps.VALIDATE_OTP_IDENTIFIER;
-  //   customJourneyContext.identifierFailedAttempts = identifierFailedAttempts;
-
-  //   return this.buildHandlerResultPayload({
-  //     customJourneyContext,
-  //     responseData: {
-  //       identifierType: this.config.quorumConfig.otpIdentifierType,
-  //     },
-  //     responseId: this.config.gvaGoals.invalidotpidentifier,
-  //   });
-  // }
-  // NEW — VALIDATE_OTP_IDENTIFIER (мінімальний і надійний)
   async validateOtpIdentifier(context: HandlerPayload): Promise<HandlerResult> {
     await this.logger.info(`DBG[${context.engagementId}] enter VALIDATE_OTP_IDENTIFIER`);
     await this.logger.info(`EngagementId: ${context.engagementId}, Validating OTP identifier`);
@@ -397,13 +264,11 @@ export class GVAGoalService extends BaseGVAGoalService {
 
     const customJourneyContext = this.getCustomJourneyContext(context);
 
-    // ---- ЄДИНА УМОВА ВАЛІДАЦІЇ: 9 цифр по REGEX, БЕЗ перевірки detectedAnswer.name
     const text = (detectedAnswer?.matchedText ?? '').trim();
     const isIdentifier = IDENTIFIER_REGEX.test(text);
     await this.logger.info(`DBG[${context.engagementId}] IDENTIFIER_REGEX=${isIdentifier}`);
 
     if (isIdentifier) {
-      // (опційно) ліміт за 24h по самому значенню
       const failedAttempts = await this.getFailedIdentifierVerifyAttempts(text);
       if (failedAttempts.length >= this.config.inputValidationFailedAttemptsLimit) {
         await this.logger.info(`EngagementId: ${context.engagementId}, OTP identifier ${text} has too many failed attempts`);
@@ -414,7 +279,6 @@ export class GVAGoalService extends BaseGVAGoalService {
         });
       }
 
-      // ініціюємо OTP надсилання
       const initAuthResponse = await this.initOtpAuthentication(text);
       if (initAuthResponse && initAuthResponse.ok) {
         customJourneyContext.otpIdentifier = text;
@@ -422,13 +286,11 @@ export class GVAGoalService extends BaseGVAGoalService {
 
         return this.buildHandlerResultPayload({
           customJourneyContext,
-          responseId: this.config.gvaGoals.enterOTPCode, // GOAL_ENTER_OTP_CODE
+          responseId: this.config.gvaGoals.enterOTPCode,
         });
       }
-      // якщо бекенд не ок — падаємо в “невдалу спробу” нижче
     }
 
-    // ---- НЕВАЛІДНО / БЕКЕНД НЕ ПІДТВЕРДИВ → інкрементуємо локальний лічильник і просимо ще раз
     let identifierFailedAttempts = Number(customJourneyContext.identifierFailedAttempts ?? 0);
     const attemptLimit = this.config.inputValidationFailedAttemptsLimit;
 
@@ -451,9 +313,9 @@ export class GVAGoalService extends BaseGVAGoalService {
     return this.buildHandlerResultPayload({
       customJourneyContext,
       responseData: {
-        identifierType: this.config.quorumConfig.otpIdentifierType, // підстановка в картку
+        identifierType: this.config.quorumConfig.otpIdentifierType,
       },
-      responseId: this.config.gvaGoals.invalidotpidentifier, // 1196653
+      responseId: this.config.gvaGoals.invalidotpidentifier,
     });
   }
 
@@ -462,13 +324,14 @@ export class GVAGoalService extends BaseGVAGoalService {
 
     const detectedAnswer = await this.answerDetectorService.detect(context);
     const candidate = (detectedAnswer?.matchedText ?? '').trim();
-    const isIdentifier = IDENTIFIER_REGEX.test(candidate);
-    await this.logger.info(`DBG[${context.engagementId}] candidate="${candidate}" IDENTIFIER_REGEX=${isIdentifier}`);
 
     const exitHandled = await this.handleMemberExitOption(context, detectedAnswer ?? undefined);
     if (exitHandled) {
       return exitHandled;
     }
+
+    const isIdentifier = IDENTIFIER_REGEX.test(candidate);
+    await this.logger.info(`DBG[${context.engagementId}] candidate="${candidate}" IDENTIFIER_REGEX=${isIdentifier}`);
 
     if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.FORGET_THE_PIN) {
       await this.handleMemberExitOption(context, detectedAnswer);
@@ -481,7 +344,6 @@ export class GVAGoalService extends BaseGVAGoalService {
     }
 
     const customJourneyContext = this.getCustomJourneyContext(context);
-
     const memberNumber = this.getMemberNumberFromContext(customJourneyContext);
 
     if (!memberNumber) {
@@ -492,8 +354,24 @@ export class GVAGoalService extends BaseGVAGoalService {
         responseId: this.config.gvaGoals.invalidMemberNumber,
       });
     }
+    // new start
+    if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.MEMBER_PIN && candidate === this.config.quorumConfig.defaultPin) {
+      await this.logger.info(
+        `EngagementId: ${context.engagementId}, Default PIN matched (${this.config.quorumConfig.defaultPin}), switching to OTP flow`,
+      );
+      customJourneyContext.STEP = GVAGoalSteps.VALIDATE_OTP_IDENTIFIER;
+      return this.buildHandlerResultPayload({
+        customJourneyContext,
+        responseData: {
+          identifierType: this.config.quorumConfig.otpIdentifierType,
+        },
+        responseId: this.config.gvaGoals.otpflowstart,
+      });
+    }
 
-    const failedAttempts = await this.getFailedIdentifierVerifyAttempts(memberNumber); // by 24h
+    // new end
+
+    const failedAttempts = await this.getFailedIdentifierVerifyAttempts(memberNumber);
     if (failedAttempts.length >= this.config.inputValidationFailedAttemptsLimit) {
       await this.logger.info(`EngagementId: ${context.engagementId}, Member number ${memberNumber} has too many failed attempts`);
       await this.tryToTransferToQueue(context.engagementId);
