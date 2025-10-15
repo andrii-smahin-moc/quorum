@@ -7,7 +7,7 @@ export class GliaKVService {
     private logger: LoggerInterface,
     kvStoreFactory: KvStoreFactory,
   ) {
-    this.kvStore = kvStoreFactory.initializeKvStore(this.config.dataDog.customer);
+    this.kvStore = kvStoreFactory.initializeKvStore(this.config.glia.kvStorageRepository);
   }
 
   getValue(key: string) {

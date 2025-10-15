@@ -9,6 +9,7 @@ export const BaseEnvironmentSchema = v.object({
   GLIA_AI_STOP_SEQUENCES: v.string(),
   GLIA_AI_TEMPERATURE: v.string(),
   GLIA_API_DOMAIN: v.string(),
+  GLIA_KV_STORAGE_REPOSITORY: v.string(),
   GLIA_LIVE_OPERATOR_QUEUE: v.string(),
   GLIA_USER_API_KEY: v.string(),
   GLIA_USER_API_KEY_SECRET: v.string(),

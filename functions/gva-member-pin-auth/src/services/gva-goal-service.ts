@@ -435,7 +435,8 @@ export class GVAGoalService extends BaseGVAGoalService {
     identifierFailedAttempts += 1;
     if (identifierFailedAttempts >= attemptLimit) {
       await this.logger.info(
-        `EngagementId: ${context.engagementId}, Exceeded allowed OTP identifier attempts (${identifierFailedAttempts}/${attemptLimit}), escalating`,
+        `EngagementId: ${context.engagementId}, ` +
+          `Exceeded allowed OTP identifier attempts (${identifierFailedAttempts}/${attemptLimit}), escalating`,
       );
       await this.tryToTransferToQueue(context.engagementId);
       return this.buildHandlerResultPayload({

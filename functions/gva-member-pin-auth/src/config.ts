@@ -25,6 +25,7 @@ export function validateConfig(environment: Record<string, unknown>): Validation
       },
       glia: {
         apiDomain: validationResult.output.GLIA_API_DOMAIN,
+        kvStorageRepository: validationResult.output.GLIA_KV_STORAGE_REPOSITORY,
         liveOperatorQueueID: validationResult.output.GLIA_LIVE_OPERATOR_QUEUE,
         siteId: validationResult.output.SITE_ID,
         userApiKey: validationResult.output.GLIA_USER_API_KEY,

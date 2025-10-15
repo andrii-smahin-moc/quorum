@@ -16,6 +16,7 @@ export interface GliaConfig {
   siteId: string;
   userApiKey: string;
   userApiKeySecret: string;
+  kvStorageRepository: string;
 }
 
 export interface GVAGoals {
