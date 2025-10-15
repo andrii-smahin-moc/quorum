@@ -84,19 +84,19 @@ export class QuorumApi {
     const url = `${this.config.quorumConfig.quorumApiDomain}/auth/pin/verify`;
     return this.httpRequest.fetchWithRetry<UnknownResponse>(url, requestOptions, 'verifyMemberPin');
   }
-  verifyOtpCode(idValue: string, code: string): Promise<HttpResponse<UnknownResponse>> {
+  verifyOtpCode(idValue: string, otp: string): Promise<HttpResponse<UnknownResponse>> {
     const headers = new Headers();
     headers.append('Content-Type', 'application/json');
     headers.append('X-GVA-API-Key', this.config.quorumConfig.quorumApiHeader);
 
     const body = JSON.stringify({
-      code,
       identifiers: [
         {
           idType: this.config.quorumConfig.otpIdentifierType,
           idValue,
         },
       ],
+      otp,
     });
 
     const requestOptions = {
