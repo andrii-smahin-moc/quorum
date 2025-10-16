@@ -1,5 +1,4 @@
-import { GliaAuthApi, GliaEngagementApi, QuorumApi } from '../apis';
-import { GliaTransferApi } from '../apis/glia-transfer-api';
+import { GliaAuthApi, GliaEngagementApi, GliaTransferApi, QuorumApi } from '../apis';
 import { IDENTIFIER_REGEX, INITIAL_STEP, MEMBER_PIN_REGEX, OTP_CODE_REGEX, ZERO_NUMBER } from '../constants';
 import { EngagementLegMediaTypeSchema, GliaKVValueSchema } from '../schemas';
 import { FunctionConfig, HandlerPayload, HandlerResult, IdentifierFailedAttemptsHistory, KvStoreFactory, LoggerInterface } from '../types';
@@ -30,7 +29,7 @@ export const AnswerOptionsList = {
 export class GVAGoalService extends BaseGVAGoalService {
   private answerDetectorService: AnswerDetectorService;
   private gliaAuthApi: GliaAuthApi;
-  private gliaEngagementApi: GliaEngagementApi;
+  private gliaEngagementApi: GliaEngagementApi | null;
   private gliaKVService: GliaKVService;
   private gliaTransferApi: GliaTransferApi;
   private quorumApi: QuorumApi;
@@ -356,7 +355,6 @@ export class GVAGoalService extends BaseGVAGoalService {
         responseId: this.config.gvaGoals.invalidMemberNumber,
       });
     }
-    // new start
     if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.MEMBER_PIN && candidate === this.config.quorumConfig.defaultPin) {
       await this.logger.info(
         `EngagementId: ${context.engagementId}, Default PIN matched (${this.config.quorumConfig.defaultPin}), switching to OTP flow`,
@@ -370,8 +368,6 @@ export class GVAGoalService extends BaseGVAGoalService {
         responseId: this.config.gvaGoals.otpflowstart,
       });
     }
-
-    // new end
 
     const failedAttempts = await this.getFailedIdentifierVerifyAttempts(memberNumber);
     if (failedAttempts.length >= this.config.inputValidationFailedAttemptsLimit) {
@@ -460,6 +456,16 @@ export class GVAGoalService extends BaseGVAGoalService {
 
   private async fetchEngagementDetails(token: string, engagementId: string) {
     try {
+      // Ensure gliaEngagementApi is not an error type
+      if (
+        !this.gliaEngagementApi ||
+        typeof this.gliaEngagementApi !== 'object' ||
+        this.gliaEngagementApi === null ||
+        typeof this.gliaEngagementApi.fetchEngagementDetails !== 'function'
+      ) {
+        await this.logger.error(`fetchEngagementDetails is not available on gliaEngagementApi`);
+        return null;
+      }
       const engagementDetails = await this.gliaEngagementApi.fetchEngagementDetails(token, engagementId);
       if (engagementDetails && engagementDetails.ok) {
         return engagementDetails;
@@ -476,11 +482,21 @@ export class GVAGoalService extends BaseGVAGoalService {
     let customJourneyContext: Record<string, unknown> = {};
     if (context.customJourneyContext) {
       const parseResult = this.safeJSONParse(context.customJourneyContext);
-      if (parseResult.status) {
+      if (
+        parseResult.status &&
+        typeof parseResult.output === 'object' &&
+        parseResult.output !== null &&
+        !Array.isArray(parseResult.output)
+      ) {
+        // Only assign if output is a plain object
         customJourneyContext = parseResult.output;
       }
     }
-    return customJourneyContext;
+    // Type guard: ensure customJourneyContext is a plain object
+    if (typeof customJourneyContext === 'object' && customJourneyContext !== null && !Array.isArray(customJourneyContext)) {
+      return customJourneyContext;
+    }
+    return {};
   }
 
   private async getEngagementMediaType(token: string, engagementId: string): Promise<string | null> {
@@ -495,7 +511,7 @@ export class GVAGoalService extends BaseGVAGoalService {
         await this.logger.error(`EngagementId: ${engagementId}, Engagement details schema validation failed`);
         return null;
       }
-      const legs = parseResult.output.legs;
+      const legs = Array.isArray(parseResult.output.legs) ? parseResult.output.legs : [];
       if (legs.length === 0) {
         await this.logger.error(`EngagementId: ${engagementId}, No engagement legs found`);
         return null;

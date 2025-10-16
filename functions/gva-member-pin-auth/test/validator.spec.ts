@@ -18,7 +18,7 @@ describe('validateSchema', () => {
   });
 
   it('returns status=false with prefixed error message on invalid input', () => {
-    const input = { a: 123 }; // має бути string
+    const input = { a: 123 };
     const res = validateSchema(schema, input, 'TEST');
 
     expect(res.status).toBe(false);

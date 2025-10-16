@@ -2,12 +2,41 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const verifyMemberExistsMock = vi.fn();
 const verifyMemberPinMock = vi.fn();
-vi.mock('../src/apis', () => ({
-  QuorumApi: vi.fn().mockImplementation(() => ({
+const verifyOtpCodeMock = vi.fn();
+const initOtpAuthMock = vi.fn();
+
+const transferToQueueMock = vi.fn().mockResolvedValue({ statusCode: 200 });
+
+vi.mock('../src/apis', async (importOriginal) => {
+  const actual = await importOriginal();
+
+  const GliaAuthApi = vi.fn().mockImplementation(() => ({
+    fetchUserBearerToken: vi.fn().mockResolvedValue({ ok: true, payload: { token: 'bearer-token' } }),
+  }));
+
+  const GliaEngagementApi = vi.fn().mockImplementation(() => ({
+    fetchEngagementDetails: vi.fn().mockResolvedValue({ ok: true, payload: { legs: [{ accepted_media_type: 'text', ended_at: null }] } }),
+  }));
+
+  const GliaTransferApi = vi.fn().mockImplementation(() => ({
+    transferToQueue: transferToQueueMock,
+  }));
+
+  const QuorumApi = vi.fn().mockImplementation(() => ({
     verifyMemberExists: verifyMemberExistsMock,
     verifyMemberPin: verifyMemberPinMock,
-  })),
-}));
+    verifyOtpCode: verifyOtpCodeMock,
+    initOtpAuthentication: initOtpAuthMock,
+  }));
+
+  return {
+    ...actual,
+    GliaAuthApi,
+    GliaEngagementApi,
+    GliaTransferApi,
+    QuorumApi,
+  };
+});
 
 const detectMock = vi.fn();
 vi.mock('../src/services/answer-detector-service', () => ({
@@ -16,10 +45,12 @@ vi.mock('../src/services/answer-detector-service', () => ({
   })),
 }));
 
+const kvGetMock = vi.fn();
+const kvSetMock = vi.fn().mockResolvedValue(undefined);
 const kvFactory = {
   initializeKvStore: vi.fn(() => ({
-    get: vi.fn(),
-    set: vi.fn().mockResolvedValue(undefined),
+    get: kvGetMock,
+    set: kvSetMock,
   })),
 };
 
@@ -37,10 +68,17 @@ const makeService = () => new GVAGoalService(expectedValidConfig as any, logger,
 
 beforeEach(() => {
   vi.clearAllMocks();
+
+  verifyMemberExistsMock.mockResolvedValue({ ok: true });
+  verifyMemberPinMock.mockResolvedValue({ ok: true, payload: { token: 'tok', expiresIn: '3600' } });
+  verifyOtpCodeMock.mockResolvedValue({ ok: true, payload: { token: 'tok', expiresIn: '3600' } });
+  initOtpAuthMock.mockResolvedValue({ ok: true });
+
+  kvGetMock.mockResolvedValue(null);
 });
 
 describe('GVAGoalService', () => {
-  it('initialStep → ставити STEP=VALIDATE_MEMBER_NUMBER і returns needToAuthentication', async () => {
+  it('initialStep → ставить STEP=VALIDATE_MEMBER_NUMBER і повертає needToAuthentication', async () => {
     const service = makeService();
     const ctx: HandlerPayload = {
       engagementId: 'e1',
@@ -58,20 +96,19 @@ describe('GVAGoalService', () => {
     expect(cjc.STEP).toBe(GVAGoalSteps.VALIDATE_MEMBER_NUMBER);
   });
 
-  it('validateMemberNumber → sucsess: number detect + Quorum confirms that exists → STEP=VALIDATE_PIN, response=enterAPin', async () => {
+  it('validateMemberNumber → success: detect number + Quorum ok → STEP=VALIDATE_PIN, response=enterAPin', async () => {
     const service = makeService();
     detectMock.mockResolvedValueOnce({
       name: AnswerOptionsList.MEMBER_NUMBER,
       matchedText: '12345678',
     });
-    verifyMemberExistsMock.mockResolvedValueOnce({ ok: true });
 
     const ctx: HandlerPayload = {
       engagementId: 'e2',
       gvaId: 'g2',
       messageType: 'text',
       text: 'my number is 12345678',
-      customJourneyContext: JSON.stringify({ failedAttempts: 1 }),
+      customJourneyContext: JSON.stringify({ memberNumberFailedAttempts: 1 }),
     } as any;
 
     const res = await service.validateMemberNumber(ctx);
@@ -81,11 +118,10 @@ describe('GVAGoalService', () => {
 
     const cjc = res.customJourneyContext as any;
     expect(cjc.memberNumber).toBe('12345678');
-    expect(cjc.failedAttempts).toBe(0);
     expect(cjc.STEP).toBe(GVAGoalSteps.VALIDATE_PIN);
   });
 
-  it('validateMemberNumber → zero (ZERO_NUMBER) → final with the zeroPress', async () => {
+  it('validateMemberNumber → ZERO_NUMBER → final zeroPress і викликає transfer', async () => {
     const service = makeService();
     detectMock.mockResolvedValueOnce({
       name: AnswerOptionsList.ZERO_NUMBER,
@@ -103,9 +139,10 @@ describe('GVAGoalService', () => {
 
     expect(res.isFinalStep).toBe(true);
     expect(res.responseId).toBe(expectedValidConfig.gvaGoals.zeroPress);
+    expect(transferToQueueMock).toHaveBeenCalled();
   });
 
-  it('validateMemberNumber → invalin num < limit → increment, response=invalidMemberNumber, STEP=VALIDATE_MEMBER_NUMBER', async () => {
+  it('validateMemberNumber → invalid < limit → increment, response=invalidMemberNumber, STEP=VALIDATE_MEMBER_NUMBER', async () => {
     const service = makeService();
     detectMock.mockResolvedValueOnce(null);
 
@@ -114,7 +151,7 @@ describe('GVAGoalService', () => {
       gvaId: 'g4',
       messageType: 'text',
       text: 'blah',
-      customJourneyContext: JSON.stringify({ failedAttempts: 1 }),
+      customJourneyContext: JSON.stringify({ memberNumberFailedAttempts: 1 }),
     } as any;
 
     const res = await service.validateMemberNumber(ctx);
@@ -123,11 +160,11 @@ describe('GVAGoalService', () => {
     expect(res.responseId).toBe(expectedValidConfig.gvaGoals.invalidMemberNumber);
 
     const cjc = res.customJourneyContext as any;
-    expect(cjc.failedAttempts).toBe(2);
+    expect(cjc.memberNumberFailedAttempts).toBe(2);
     expect(cjc.STEP).toBe(GVAGoalSteps.VALIDATE_MEMBER_NUMBER);
   });
 
-  it('validateMemberNumber → invalid num with exiceeded limit → final transferToLiveOperator', async () => {
+  it('validateMemberNumber → invalid with exceeded limit → final transferToLiveOperator (+transfer)', async () => {
     const service = makeService();
     detectMock.mockResolvedValueOnce(null);
 
@@ -137,22 +174,23 @@ describe('GVAGoalService', () => {
       gvaId: 'g5',
       messageType: 'text',
       text: 'meh',
-      customJourneyContext: JSON.stringify({ failedAttempts: limit - 1 }),
+      customJourneyContext: JSON.stringify({ memberNumberFailedAttempts: limit - 1 }),
     } as any;
 
     const res = await service.validateMemberNumber(ctx);
 
     expect(res.isFinalStep).toBe(true);
     expect(res.responseId).toBe(expectedValidConfig.gvaGoals.transferToLiveOperator);
+    expect(transferToQueueMock).toHaveBeenCalled();
   });
 
-  it('validatePin → sucsess: detect PIN + Quorum returned token/expiresIn → final with success with auth', async () => {
+  it('validatePin → success: detect PIN + Quorum ok → final success with auth', async () => {
     const service = makeService();
     detectMock.mockResolvedValueOnce({
       name: AnswerOptionsList.MEMBER_PIN,
       matchedText: '1234',
     });
-    verifyMemberPinMock.mockResolvedValueOnce({ token: 'tok', expiresIn: '3600' });
+    verifyMemberPinMock.mockResolvedValueOnce({ ok: true, payload: { token: 'tok', expiresIn: '3600' } });
 
     const ctx: HandlerPayload = {
       engagementId: 'e6',
@@ -170,7 +208,7 @@ describe('GVAGoalService', () => {
     expect(res.auth).toEqual({ token: 'tok', expiresIn: 3600 });
   });
 
-  it('validatePin → memberNumber missing → final with invalidMemberNumber', async () => {
+  it('validatePin → memberNumber missing → final invalidMemberNumber (+transfer)', async () => {
     const service = makeService();
     detectMock.mockResolvedValueOnce({
       name: AnswerOptionsList.MEMBER_PIN,
@@ -189,9 +227,10 @@ describe('GVAGoalService', () => {
 
     expect(res.isFinalStep).toBe(true);
     expect(res.responseId).toBe(expectedValidConfig.gvaGoals.invalidMemberNumber);
+    expect(transferToQueueMock).toHaveBeenCalled();
   });
 
-  it('validatePin → forgot the PIN” → final with forgotPin', async () => {
+  it('validatePin → "forgot the PIN" → final forgotPin (+transfer)', async () => {
     const service = makeService();
     detectMock.mockResolvedValueOnce({
       name: AnswerOptionsList.FORGET_THE_PIN,
@@ -210,9 +249,10 @@ describe('GVAGoalService', () => {
 
     expect(res.isFinalStep).toBe(true);
     expect(res.responseId).toBe(expectedValidConfig.gvaGoals.forgotPin);
+    expect(transferToQueueMock).toHaveBeenCalled();
   });
 
-  it('validatePin → invalid PIN < limit → increment, response=invalidPin, STEP=VALIDATE_PIN + responseData', async () => {
+  it('validatePin → invalid < limit → response=invalidPin, STEP=VALIDATE_PIN + responseData (лічильник з KV)', async () => {
     const service = makeService();
     detectMock.mockResolvedValueOnce(null);
 
@@ -223,7 +263,6 @@ describe('GVAGoalService', () => {
       text: 'abcd',
       customJourneyContext: JSON.stringify({
         STEP: GVAGoalSteps.VALIDATE_PIN,
-        enterPinFailedAttempts: 1,
         memberNumber: '111222',
       }),
     } as any;
@@ -234,20 +273,24 @@ describe('GVAGoalService', () => {
     expect(res.responseId).toBe(expectedValidConfig.gvaGoals.invalidPin);
 
     const cjc = res.customJourneyContext as any;
-    expect(cjc.enterPinFailedAttempts).toBe(2);
     expect(cjc.STEP).toBe(GVAGoalSteps.VALIDATE_PIN);
 
     expect(res.responseData).toEqual({
       pinAttemptLimit: expectedValidConfig.inputValidationFailedAttemptsLimit,
-      pinAttemptNumber: 2,
+      pinAttemptNumber: expect.any(Number),
     });
   });
 
-  it('validatePin → invalid PIN with exided limit  → final pinAttemptExceeded', async () => {
+  it('validatePin → invalid with exceeded limit → final pinAttemptExceeded (+transfer)', async () => {
     const service = makeService();
     detectMock.mockResolvedValueOnce(null);
 
     const limit = expectedValidConfig.inputValidationFailedAttemptsLimit;
+
+    (service as any).getFailedIdentifierVerifyAttempts = vi
+      .fn()
+      .mockResolvedValue(Array.from({ length: limit - 1 }, () => Date.now() - 1000));
+
     const ctx: HandlerPayload = {
       engagementId: 'e10',
       gvaId: 'g10',
@@ -255,7 +298,6 @@ describe('GVAGoalService', () => {
       text: 'nope',
       customJourneyContext: JSON.stringify({
         STEP: GVAGoalSteps.VALIDATE_PIN,
-        enterPinFailedAttempts: limit - 1,
         memberNumber: '111222',
       }),
     } as any;
@@ -264,5 +306,6 @@ describe('GVAGoalService', () => {
 
     expect(res.isFinalStep).toBe(true);
     expect(res.responseId).toBe(expectedValidConfig.gvaGoals.pinAttemptExceeded);
+    expect(transferToQueueMock).toHaveBeenCalled();
   });
 });

@@ -67,7 +67,7 @@ export function validateConfig(environment: Record<string, unknown>): Validation
       inputValidationFailedAttemptsLimit: Number(validationResult.output.INPUT_VALIDATION_FAILED_ATTEMPTS) || 3,
 
       quorumConfig: {
-        defaultPin: validationResult.output.QUORUM_DEFAULT_PIN,
+        defaultPin: validationResult.output.QUORUM_DEFAULT_PIN ?? '',
         otpIdentifierType: validationResult.output.VALIDATE_OTP_IDENTIFIER,
         quorumApiDomain: validationResult.output.QUORUM_API_DOMAIN,
         quorumApiHeader: validationResult.output.QUORUM_API_HEADER,
