@@ -1,7 +1,7 @@
-import { GliaAuthApi, QuorumApi } from '../apis';
+import { GliaAuthApi, GliaEngagementApi, QuorumApi } from '../apis';
 import { GliaTransferApi } from '../apis/glia-transfer-api';
 import { IDENTIFIER_REGEX, INITIAL_STEP, MEMBER_PIN_REGEX, OTP_CODE_REGEX, ZERO_NUMBER } from '../constants';
-import { GliaKVValueSchema } from '../schemas';
+import { EngagementLegMediaTypeSchema, GliaKVValueSchema } from '../schemas';
 import { FunctionConfig, HandlerPayload, HandlerResult, IdentifierFailedAttemptsHistory, KvStoreFactory, LoggerInterface } from '../types';
 import { validateSchema } from '../validator';
 
@@ -30,6 +30,7 @@ export const AnswerOptionsList = {
 export class GVAGoalService extends BaseGVAGoalService {
   private answerDetectorService: AnswerDetectorService;
   private gliaAuthApi: GliaAuthApi;
+  private gliaEngagementApi: GliaEngagementApi;
   private gliaKVService: GliaKVService;
   private gliaTransferApi: GliaTransferApi;
   private quorumApi: QuorumApi;
@@ -44,6 +45,7 @@ export class GVAGoalService extends BaseGVAGoalService {
     this.quorumApi = new QuorumApi(config, logger);
     this.gliaKVService = new GliaKVService(config, logger, kvStoreFactory);
     this.gliaTransferApi = new GliaTransferApi(config, logger);
+    this.gliaEngagementApi = new GliaEngagementApi(config, logger);
 
     this.register(INITIAL_STEP, this.initialStep.bind(this));
     this.register(GVAGoalSteps.VALIDATE_MEMBER_NUMBER, this.validateMemberNumber.bind(this));
@@ -456,6 +458,20 @@ export class GVAGoalService extends BaseGVAGoalService {
     }
   }
 
+  private async fetchEngagementDetails(token: string, engagementId: string) {
+    try {
+      const engagementDetails = await this.gliaEngagementApi.fetchEngagementDetails(token, engagementId);
+      if (engagementDetails && engagementDetails.ok) {
+        return engagementDetails;
+      }
+      return null;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error in fetchEngagementDetails';
+      await this.logger.error(`Error fetching engagement details: ${message}`);
+      return null;
+    }
+  }
+
   private getCustomJourneyContext(context: HandlerPayload) {
     let customJourneyContext: Record<string, unknown> = {};
     if (context.customJourneyContext) {
@@ -465,6 +481,38 @@ export class GVAGoalService extends BaseGVAGoalService {
       }
     }
     return customJourneyContext;
+  }
+
+  private async getEngagementMediaType(token: string, engagementId: string): Promise<string | null> {
+    try {
+      const engagementResponse = await this.fetchEngagementDetails(token, engagementId);
+      if (!engagementResponse || !engagementResponse.ok) {
+        await this.logger.error(`EngagementId: ${engagementId}, Unable to fetch engagement details`);
+        return null;
+      }
+      const parseResult = validateSchema(EngagementLegMediaTypeSchema, engagementResponse.payload, 'getEngagementMediaType');
+      if (!parseResult.status || !parseResult.output) {
+        await this.logger.error(`EngagementId: ${engagementId}, Engagement details schema validation failed`);
+        return null;
+      }
+      const legs = parseResult.output.legs;
+      if (legs.length === 0) {
+        await this.logger.error(`EngagementId: ${engagementId}, No engagement legs found`);
+        return null;
+      }
+
+      const activeLeg = legs.find((leg) => leg.ended_at === null);
+      if (!activeLeg) {
+        await this.logger.error(`EngagementId: ${engagementId}, No active engagement leg found`);
+        return null;
+      }
+
+      return activeLeg.accepted_media_type;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error in getEngagementMediaType';
+      await this.logger.error(`EngagementId: ${engagementId}, Error fetching engagement media type: ${message}`);
+      return null;
+    }
   }
 
   private async getFailedIdentifierVerifyAttempts(identifierValue: string): Promise<number[]> {
@@ -550,8 +598,15 @@ export class GVAGoalService extends BaseGVAGoalService {
       await this.logger.error(`EngagementId: ${engagementId}, Unable to fetch auth token for transferToQueue`);
       return;
     }
+
+    const engagementMediaType = await this.getEngagementMediaType(token, engagementId);
+    if (!engagementMediaType) {
+      await this.logger.error(`EngagementId: ${engagementId}, Unable to fetch engagement media type for transferToQueue`);
+      return;
+    }
+
     try {
-      const result = await this.gliaTransferApi.transferToQueue(token, engagementId);
+      const result = await this.gliaTransferApi.transferToQueue(token, engagementId, engagementMediaType);
       await this.logger.info(`EngagementId: ${engagementId}, Transfer to queue result: ${result.statusCode}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error in tryToTransferToQueue';

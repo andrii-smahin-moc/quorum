@@ -18,3 +18,12 @@ export const GliaKVValueSchema = v.object({
   key: v.string(),
   value: v.nullable(v.string()),
 });
+
+const EngagementLegMinimalSchema = v.object({
+  accepted_media_type: v.union([v.literal('text'), v.literal('audio'), v.literal('phone'), v.literal('video')]),
+  ended_at: v.nullable(v.string()),
+});
+
+export const EngagementLegMediaTypeSchema = v.object({
+  legs: v.array(EngagementLegMinimalSchema),
+});

@@ -2,7 +2,7 @@ import type { FunctionConfig, HttpResponse, LoggerInterface, UnknownResponse } f
 
 import { HttpRequest } from './http-request';
 
-export class GliaTransferApi {
+export class GliaEngagementApi {
   private httpRequest: HttpRequest;
 
   constructor(
@@ -12,24 +12,17 @@ export class GliaTransferApi {
     this.httpRequest = new HttpRequest(config, logger);
   }
 
-  transferToQueue(token: string, engagementId: string, media: string): Promise<HttpResponse<UnknownResponse>> {
+  fetchEngagementDetails(token: string, engagementId: string): Promise<HttpResponse<UnknownResponse>> {
     const headers = new Headers();
     headers.append('Content-Type', 'application/json');
     headers.append('authorization', `Bearer ${token}`);
 
-    const body = JSON.stringify({
-      engagement_id: engagementId,
-      media,
-      queue_id: this.config.glia.liveOperatorQueueID,
-    });
-
     const requestOptions = {
-      body,
       headers,
-      method: 'POST',
+      method: 'GET',
     };
 
-    const url = `${this.config.glia.apiDomain}/transfer_tickets`;
-    return this.httpRequest.fetchWithRetry<UnknownResponse>(url, requestOptions, 'transferToQueue');
+    const url = `${this.config.glia.apiDomain}/engagements/${engagementId}`;
+    return this.httpRequest.fetchWithRetry<UnknownResponse>(url, requestOptions, 'fetchEngagementDetails');
   }
 }
