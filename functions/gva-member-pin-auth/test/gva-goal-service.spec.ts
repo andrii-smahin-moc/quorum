@@ -78,7 +78,7 @@ beforeEach(() => {
 });
 
 describe('GVAGoalService', () => {
-  it('initialStep → ставить STEP=VALIDATE_MEMBER_NUMBER і повертає needToAuthentication', async () => {
+  it('initialStep → set the STEP=VALIDATE_MEMBER_NUMBER і return needToAuthentication', async () => {
     const service = makeService();
     const ctx: HandlerPayload = {
       engagementId: 'e1',
