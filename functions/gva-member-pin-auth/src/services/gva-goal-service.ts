@@ -1,5 +1,5 @@
 import { GliaAuthApi, GliaEngagementApi, GliaTransferApi, QuorumApi } from '../apis';
-import { IDENTIFIER_REGEX, INITIAL_STEP, MEMBER_PIN_REGEX, OTP_CODE_REGEX, ZERO_NUMBER } from '../constants';
+import { IDENTIFIER_REGEX, IdentifierTitles, INITIAL_STEP, MEMBER_PIN_REGEX, OTP_CODE_REGEX, ZERO_NUMBER } from '../constants';
 import { EngagementLegMediaTypeSchema, GliaKVValueSchema } from '../schemas';
 import { FunctionConfig, HandlerPayload, HandlerResult, IdentifierFailedAttemptsHistory, KvStoreFactory, LoggerInterface } from '../types';
 import { validateSchema } from '../validator';
@@ -138,7 +138,7 @@ export class GVAGoalService extends BaseGVAGoalService {
         return this.buildHandlerResultPayload({
           customJourneyContext,
           responseData: {
-            identifierType: this.config.quorumConfig.otpIdentifierType,
+            identifierType: IdentifierTitles[this.config.quorumConfig.otpIdentifierType as keyof typeof IdentifierTitles],
           },
           responseId: this.config.gvaGoals.otpflowstart,
         });
@@ -193,7 +193,7 @@ export class GVAGoalService extends BaseGVAGoalService {
       return this.buildHandlerResultPayload({
         customJourneyContext,
         responseData: {
-          identifierType: this.config.quorumConfig.otpIdentifierType,
+          identifierType: IdentifierTitles[this.config.quorumConfig.otpIdentifierType as keyof typeof IdentifierTitles],
         },
         responseId: this.config.gvaGoals.invalidotpidentifier,
       });
@@ -314,7 +314,7 @@ export class GVAGoalService extends BaseGVAGoalService {
     return this.buildHandlerResultPayload({
       customJourneyContext,
       responseData: {
-        identifierType: this.config.quorumConfig.otpIdentifierType,
+        identifierType: IdentifierTitles[this.config.quorumConfig.otpIdentifierType as keyof typeof IdentifierTitles],
       },
       responseId: this.config.gvaGoals.invalidotpidentifier,
     });
@@ -363,7 +363,7 @@ export class GVAGoalService extends BaseGVAGoalService {
       return this.buildHandlerResultPayload({
         customJourneyContext,
         responseData: {
-          identifierType: this.config.quorumConfig.otpIdentifierType,
+          identifierType: IdentifierTitles[this.config.quorumConfig.otpIdentifierType as keyof typeof IdentifierTitles],
         },
         responseId: this.config.gvaGoals.otpflowstart,
       });
