@@ -72,7 +72,7 @@ export class QuorumApi {
           idValue,
         },
       ],
-      pin,
+      pin: Number(pin),
     });
 
     const requestOptions = {
@@ -96,7 +96,7 @@ export class QuorumApi {
           idValue,
         },
       ],
-      otp,
+      otp: Number(otp),
     });
 
     const requestOptions = {
