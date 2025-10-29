@@ -15,7 +15,7 @@ export class QuorumApi {
   initOtpAuthentication(idValue: string): Promise<HttpResponse<UnknownResponse>> {
     const headers = new Headers();
     headers.append('Content-Type', 'application/json');
-    headers.append('X-GVA-API-Key', this.config.quorumConfig.quorumApiHeader);
+    headers.append('x-gva-api-key', this.config.quorumConfig.quorumApiHeader);
 
     const body = JSON.stringify({
       identifiers: [
@@ -39,7 +39,7 @@ export class QuorumApi {
   verifyMemberExists(idValue: string): Promise<HttpResponse<UnknownResponse>> {
     const headers = new Headers();
     headers.append('Content-Type', 'application/json');
-    headers.append('X-GVA-API-Key', this.config.quorumConfig.quorumApiHeader);
+    headers.append('x-gva-api-key', this.config.quorumConfig.quorumApiHeader);
 
     const body = JSON.stringify({
       identifiers: [
@@ -63,7 +63,7 @@ export class QuorumApi {
   verifyMemberPin(idValue: string, pin: string): Promise<HttpResponse<UnknownResponse>> {
     const headers = new Headers();
     headers.append('Content-Type', 'application/json');
-    headers.append('X-GVA-API-Key', this.config.quorumConfig.quorumApiHeader);
+    headers.append('x-gva-api-key', this.config.quorumConfig.quorumApiHeader);
 
     const body = JSON.stringify({
       identifiers: [
@@ -87,7 +87,7 @@ export class QuorumApi {
   verifyOtpCode(idValue: string, otp: string): Promise<HttpResponse<UnknownResponse>> {
     const headers = new Headers();
     headers.append('Content-Type', 'application/json');
-    headers.append('X-GVA-API-Key', this.config.quorumConfig.quorumApiHeader);
+    headers.append('x-gva-api-key', this.config.quorumConfig.quorumApiHeader);
 
     const body = JSON.stringify({
       identifiers: [
