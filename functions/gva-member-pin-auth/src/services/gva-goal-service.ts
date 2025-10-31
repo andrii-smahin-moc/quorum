@@ -324,15 +324,11 @@ export class GVAGoalService extends BaseGVAGoalService {
     await this.logger.info(`EngagementId: ${context.engagementId}, Validating PIN`);
 
     const detectedAnswer = await this.answerDetectorService.detect(context);
-    const candidate = (detectedAnswer?.matchedText ?? '').trim();
 
     const exitHandled = await this.handleMemberExitOption(context, detectedAnswer ?? undefined);
     if (exitHandled) {
       return exitHandled;
     }
-
-    const isIdentifier = IDENTIFIER_REGEX.test(candidate);
-    await this.logger.info(`DBG[${context.engagementId}] candidate="${candidate}" IDENTIFIER_REGEX=${isIdentifier}`);
 
     if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.FORGET_THE_PIN) {
       await this.handleMemberExitOption(context, detectedAnswer);
@@ -355,31 +351,22 @@ export class GVAGoalService extends BaseGVAGoalService {
         responseId: this.config.gvaGoals.invalidMemberNumber,
       });
     }
-    if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.MEMBER_PIN && candidate === this.config.quorumConfig.defaultPin) {
-      await this.logger.info(
-        `EngagementId: ${context.engagementId}, Default PIN matched (${this.config.quorumConfig.defaultPin}), switching to OTP flow`,
-      );
-      customJourneyContext.STEP = GVAGoalSteps.VALIDATE_OTP_IDENTIFIER;
-      return this.buildHandlerResultPayload({
-        customJourneyContext,
-        responseData: {
-          identifierType: IdentifierTitles[this.config.quorumConfig.otpIdentifierType as keyof typeof IdentifierTitles],
-        },
-        responseId: this.config.gvaGoals.otpflowstart,
-      });
-    }
-
-    const failedAttempts = await this.getFailedIdentifierVerifyAttempts(memberNumber);
-    if (failedAttempts.length >= this.config.inputValidationFailedAttemptsLimit) {
-      await this.logger.info(`EngagementId: ${context.engagementId}, Member number ${memberNumber} has too many failed attempts`);
-      await this.tryToTransferToQueue(context.engagementId);
-      return this.buildHandlerResultPayload({
-        isFinalStep: true,
-        responseId: this.config.gvaGoals.transferToLiveOperator,
-      });
-    }
 
     if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.MEMBER_PIN && detectedAnswer.matchedText) {
+      if (detectedAnswer.matchedText === this.config.quorumConfig.defaultPin) {
+        await this.logger.info(
+          `EngagementId: ${context.engagementId}, Default PIN matched (${this.config.quorumConfig.defaultPin}), switching to OTP flow`,
+        );
+        customJourneyContext.STEP = GVAGoalSteps.VALIDATE_OTP_IDENTIFIER;
+        return this.buildHandlerResultPayload({
+          customJourneyContext,
+          responseData: {
+            identifierType: IdentifierTitles[this.config.quorumConfig.otpIdentifierType as keyof typeof IdentifierTitles],
+          },
+          responseId: this.config.gvaGoals.otpflowstart,
+        });
+      }
+
       await this.logger.info(`EngagementId: ${context.engagementId}, Valid PIN received: ${detectedAnswer.matchedText}`);
 
       const authResultResponse = await this.verifyMemberPin(memberNumber, detectedAnswer.matchedText);
@@ -387,7 +374,7 @@ export class GVAGoalService extends BaseGVAGoalService {
         authResultResponse &&
         authResultResponse.ok &&
         typeof authResultResponse.payload.token === 'string' &&
-        typeof authResultResponse.payload.expiresIn === 'string'
+        String(authResultResponse.payload.expiresIn)
       ) {
         await this.logger.info(`EngagementId: ${context.engagementId}, PIN verified successfully`);
 
@@ -409,6 +396,16 @@ export class GVAGoalService extends BaseGVAGoalService {
           responseId: this.config.gvaGoals.successfullyVerifiesMemberNumberAndPin,
         });
       }
+    }
+
+    const failedAttempts = await this.getFailedIdentifierVerifyAttempts(memberNumber);
+    if (failedAttempts.length >= this.config.inputValidationFailedAttemptsLimit) {
+      await this.logger.info(`EngagementId: ${context.engagementId}, Member number ${memberNumber} has too many failed attempts`);
+      await this.tryToTransferToQueue(context.engagementId);
+      return this.buildHandlerResultPayload({
+        isFinalStep: true,
+        responseId: this.config.gvaGoals.transferToLiveOperator,
+      });
     }
 
     const newFailedAttempts = await this.saveIdentifierFailedAttempt(memberNumber, failedAttempts);
