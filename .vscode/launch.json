@@ -13,27 +13,27 @@
       "resolveSourceMapLocations": null,
       "attachExistingChildren": false,
       "autoAttachChildProcesses": false
-    }
-    // {
-    //   "name": "Debug Vitest Tests corp-cs",
-    //   "type": "node",
-    //   "request": "launch",
-    //   "program": "${workspaceFolder}/functions/corp-cs-dynamics-integration/node_modules/.bin/vitest",
-    //   "args": [
-    //     "run",
-    //     "dynamics-service.spec.ts",
-    //     "--testTimeout=600000"
-    //   ],
-    //   "console": "integratedTerminal",
-    //   "internalConsoleOptions": "neverOpen",
-    //   "skipFiles": [
-    //     "<node_internals>/**",
-    //     "node_modules/**"
-    //   ],
-    //   "env": {
-    //     "NODE_ENV": "test"
-    //   }
-    // },
+    },
+    {
+      "name": "Debug Vitest Tests corp-cs",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/functions/gva-member-pin-auth/node_modules/.bin/vitest",
+      "args": [
+        "run",
+        "config.spec.ts",
+        "--testTimeout=600000"
+      ],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": [
+        "<node_internals>/**",
+        "node_modules/**"
+      ],
+      "env": {
+        "NODE_ENV": "test"
+      }
+    },
     // {
     //   "name": "Debug Vitest Tests customer",
     //   "type": "node",
