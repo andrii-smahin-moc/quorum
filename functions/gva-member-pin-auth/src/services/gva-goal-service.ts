@@ -23,6 +23,7 @@ export const AnswerOptionsList = {
   MEMBER_PIN: 'member_pin',
   OTP_CODE: 'otp_code',
   OTP_IDENTIFIER: 'otp_identifier',
+  TALK_TO_AGENT_OPTION: 'talk_to_agent',
   ZERO_NUMBER: 'zero_number',
 };
 
@@ -59,6 +60,21 @@ export class GVAGoalService extends BaseGVAGoalService {
       new AnswerOption(AnswerOptionsList.ZERO_NUMBER, [ZERO_NUMBER, 'zero']),
       new AnswerOption(AnswerOptionsList.OTP_IDENTIFIER, [IDENTIFIER_REGEX]),
       new AnswerOption(AnswerOptionsList.OTP_CODE, [OTP_CODE_REGEX]),
+      new AnswerOption(AnswerOptionsList.TALK_TO_AGENT_OPTION, [
+        'person',
+        'representative',
+        'agent',
+        'human',
+        'service',
+        'support',
+        'human',
+        'live person',
+        'live chat',
+        'operator',
+        'technical support',
+        'tech support',
+        'customer service',
+      ]),
       new AnswerOption(AnswerOptionsList.MEMBER_EXIT_OPTION, [
         'exit',
         'quit',
@@ -211,7 +227,8 @@ export class GVAGoalService extends BaseGVAGoalService {
         typeof verifyResponse.payload.token === 'string' &&
         String(verifyResponse.payload.expiresIn)
       ) {
-        await this.resetFailedAttemptsHistory(detectedAnswer.matchedText);
+        // await this.resetFailedAttemptsHistory(detectedAnswer.matchedText); // OTP code is one-time use, no need to reset attempts
+        await this.resetFailedAttemptsHistory(otpIdentifier); // reset attempts for identifier upon successful OTP verification THIS IS NEW FIXED LINE
 
         const expiresIn =
           Number(verifyResponse.payload.expiresIn) <= 3600 * 24 ? Date.now() + Number(verifyResponse.payload.expiresIn) * 1000 : Date.now();
@@ -262,7 +279,12 @@ export class GVAGoalService extends BaseGVAGoalService {
     await this.logger.info(
       `DBG[${context.engagementId}] detect name=${detectedAnswer?.name ?? '∅'} text="${detectedAnswer?.matchedText ?? ''}"`,
     );
-
+    // this is new code below to check talk to agent option in the OTP identifier step
+    const exitHandled = await this.handleMemberExitOption(context, detectedAnswer ?? undefined);
+    if (exitHandled) {
+      return exitHandled;
+    }
+    // new code above to check talk to agent option in the OTP identifier step
     const customJourneyContext = this.getCustomJourneyContext(context);
 
     const text = (detectedAnswer?.matchedText ?? '').trim();
@@ -556,17 +578,39 @@ export class GVAGoalService extends BaseGVAGoalService {
     context: HandlerPayload,
     detectedAnswer?: { matchedText?: string | null; name?: string },
   ): Promise<HandlerResult | null> {
-    if (!detectedAnswer || detectedAnswer.name !== AnswerOptionsList.MEMBER_EXIT_OPTION) {
+    // this is new code below to check talk to agent option
+    const isEscalation =
+      !!detectedAnswer &&
+      (detectedAnswer.name === AnswerOptionsList.MEMBER_EXIT_OPTION || detectedAnswer.name === AnswerOptionsList.TALK_TO_AGENT_OPTION);
+
+    if (!isEscalation) {
       return null;
     }
 
-    await this.logger.info(`EngagementId: ${context.engagementId}, Exit option detected (${detectedAnswer.matchedText ?? ''})`);
+    await this.logger.info(`EngagementId: ${context.engagementId}, Escalation requested (${detectedAnswer?.matchedText ?? ''})`);
     await this.tryToTransferToQueue(context.engagementId);
 
     return this.buildHandlerResultPayload({
       isFinalStep: true,
       responseId: this.config.gvaGoals.transferToLiveOperator,
     });
+    // new code above to check talk to agent option
+    // ----------------------------------------------------------------------------------------
+    // old code below is commented to check new talk to agent option
+
+    // if (!detectedAnswer || detectedAnswer.name !== AnswerOptionsList.MEMBER_EXIT_OPTION) {
+    //   return null;
+    // }
+
+    // await this.logger.info(`EngagementId: ${context.engagementId}, Exit option detected (${detectedAnswer.matchedText ?? ''})`);
+    // await this.tryToTransferToQueue(context.engagementId);
+
+    // return this.buildHandlerResultPayload({
+    //   isFinalStep: true,
+    //   responseId: this.config.gvaGoals.transferToLiveOperator,
+    // });
+
+    // old code above is commented to check new talk to agent option
   }
 
   private async initOtpAuthentication(identifier: string) {

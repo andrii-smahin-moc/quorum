@@ -64,7 +64,7 @@ export function validateConfig(environment: Record<string, unknown>): Validation
         zeroPress: validationResult.output.GOAL_ZERO_PRESS,
       },
 
-      inputValidationFailedAttemptsLimit: Number(validationResult.output.INPUT_VALIDATION_FAILED_ATTEMPTS) || 3,
+      inputValidationFailedAttemptsLimit: Number(validationResult.output.INPUT_VALIDATION_FAILED_ATTEMPTS) || 5, // changed 3 to 5
 
       quorumConfig: {
         defaultPin: validationResult.output.QUORUM_DEFAULT_PIN ?? '',
