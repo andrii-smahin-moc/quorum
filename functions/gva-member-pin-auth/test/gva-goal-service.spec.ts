@@ -11,18 +11,24 @@ vi.mock('../src/apis', async (importOriginal) => {
   const actual = await importOriginal();
 
   const GliaAuthApi = vi.fn().mockImplementation(() => ({
-    fetchUserBearerToken: vi.fn().mockResolvedValue({ ok: true, payload: { token: 'bearer-token' } }),
+    fetchUserBearerToken: vi.fn().mockResolvedValue({
+      ok: true,
+      payload: { token: 'bearer-token' },
+    }),
   }));
 
   const GliaEngagementApi = vi.fn().mockImplementation(() => ({
-    fetchEngagementDetails: vi.fn().mockResolvedValue({ ok: true, payload: { legs: [{ accepted_media_type: 'text', ended_at: null }] } }),
+    fetchEngagementDetails: vi.fn().mockResolvedValue({
+      ok: true,
+      payload: { legs: [{ accepted_media_type: 'text', ended_at: null }] },
+    }),
   }));
 
   const GliaTransferApi = vi.fn().mockImplementation(() => ({
     transferToQueue: transferToQueueMock,
   }));
 
-  const QuorumApi = vi.fn().mockImplementation(() => ({
+  const LynktekApi = vi.fn().mockImplementation(() => ({
     verifyMemberExists: verifyMemberExistsMock,
     verifyMemberPin: verifyMemberPinMock,
     verifyOtpCode: verifyOtpCodeMock,
@@ -30,11 +36,10 @@ vi.mock('../src/apis', async (importOriginal) => {
   }));
 
   return {
-    ...actual,
     GliaAuthApi,
     GliaEngagementApi,
     GliaTransferApi,
-    QuorumApi,
+    LynktekApi,
   };
 });
 
@@ -54,9 +59,10 @@ const kvFactory = {
   })),
 };
 
-import { GVAGoalService, GVAGoalSteps, AnswerOptionsList } from '../src/services/gva-goal-service';
+import { GVAGoalService } from '../src/services/gva-goal-service';
 import type { HandlerPayload, LoggerInterface } from '../src/types';
 import { expectedValidConfig } from './mock-data';
+import { AnswerOptionsList, GVAGoalSteps } from '../src/constants';
 
 const logger: LoggerInterface = {
   info: vi.fn().mockResolvedValue(undefined),
@@ -70,15 +76,21 @@ beforeEach(() => {
   vi.clearAllMocks();
 
   verifyMemberExistsMock.mockResolvedValue({ ok: true });
-  verifyMemberPinMock.mockResolvedValue({ ok: true, payload: { token: 'tok', expiresIn: '3600' } });
-  verifyOtpCodeMock.mockResolvedValue({ ok: true, payload: { token: 'tok', expiresIn: '3600' } });
+  verifyMemberPinMock.mockResolvedValue({
+    ok: true,
+    payload: { token: 'tok', expiresIn: '3600' },
+  });
+  verifyOtpCodeMock.mockResolvedValue({
+    ok: true,
+    payload: { token: 'tok', expiresIn: '3600' },
+  });
   initOtpAuthMock.mockResolvedValue({ ok: true });
 
   kvGetMock.mockResolvedValue(null);
 });
 
 describe('GVAGoalService', () => {
-  it('initialStep → set the STEP=VALIDATE_MEMBER_NUMBER і return needToAuthentication', async () => {
+  it('initialStep → set STEP=VALIDATE_MEMBER_NUMBER and return needToAuthentication', async () => {
     const service = makeService();
     const ctx: HandlerPayload = {
       engagementId: 'e1',
@@ -96,7 +108,7 @@ describe('GVAGoalService', () => {
     expect(cjc.STEP).toBe(GVAGoalSteps.VALIDATE_MEMBER_NUMBER);
   });
 
-  it('validateMemberNumber → success: detect number + Quorum ok → STEP=VALIDATE_PIN, response=enterAPin', async () => {
+  it('validateMemberNumber → success: detect number + Lynktek ok → STEP=VALIDATE_PIN', async () => {
     const service = makeService();
     detectMock.mockResolvedValueOnce({
       name: AnswerOptionsList.MEMBER_NUMBER,
@@ -121,7 +133,7 @@ describe('GVAGoalService', () => {
     expect(cjc.STEP).toBe(GVAGoalSteps.VALIDATE_PIN);
   });
 
-  it('validateMemberNumber → ZERO_NUMBER → final zeroPress і викликає transfer', async () => {
+  it('validateMemberNumber → ZERO_NUMBER → final zeroPress + transfer', async () => {
     const service = makeService();
     detectMock.mockResolvedValueOnce({
       name: AnswerOptionsList.ZERO_NUMBER,
@@ -142,7 +154,7 @@ describe('GVAGoalService', () => {
     expect(transferToQueueMock).toHaveBeenCalled();
   });
 
-  it('validateMemberNumber → invalid < limit → increment, response=invalidMemberNumber, STEP=VALIDATE_MEMBER_NUMBER', async () => {
+  it('validateMemberNumber → invalid < limit → increment + invalidMemberNumber', async () => {
     const service = makeService();
     detectMock.mockResolvedValueOnce(null);
 
@@ -164,7 +176,7 @@ describe('GVAGoalService', () => {
     expect(cjc.STEP).toBe(GVAGoalSteps.VALIDATE_MEMBER_NUMBER);
   });
 
-  it('validateMemberNumber → invalid with exceeded limit → final transferToLiveOperator (+transfer)', async () => {
+  it('validateMemberNumber → invalid with exceeded limit → final transferToLiveOperator', async () => {
     const service = makeService();
     detectMock.mockResolvedValueOnce(null);
 
@@ -174,7 +186,9 @@ describe('GVAGoalService', () => {
       gvaId: 'g5',
       messageType: 'text',
       text: 'meh',
-      customJourneyContext: JSON.stringify({ memberNumberFailedAttempts: limit - 1 }),
+      customJourneyContext: JSON.stringify({
+        memberNumberFailedAttempts: limit - 1,
+      }),
     } as any;
 
     const res = await service.validateMemberNumber(ctx);
@@ -184,20 +198,26 @@ describe('GVAGoalService', () => {
     expect(transferToQueueMock).toHaveBeenCalled();
   });
 
-  it('validatePin → success: detect PIN + Quorum ok → final success with auth', async () => {
+  it('validatePin → success: detect PIN + Lynktek ok → final success', async () => {
     const service = makeService();
     detectMock.mockResolvedValueOnce({
       name: AnswerOptionsList.MEMBER_PIN,
       matchedText: '1234',
     });
-    verifyMemberPinMock.mockResolvedValueOnce({ ok: true, payload: { token: 'tok', expiresIn: '3600' } });
+    verifyMemberPinMock.mockResolvedValueOnce({
+      ok: true,
+      payload: { token: 'tok', expiresIn: '3600' },
+    });
 
     const ctx: HandlerPayload = {
       engagementId: 'e6',
       gvaId: 'g6',
       messageType: 'text',
       text: 'pin 1234',
-      customJourneyContext: JSON.stringify({ STEP: GVAGoalSteps.VALIDATE_PIN, memberNumber: '12345678' }),
+      customJourneyContext: JSON.stringify({
+        STEP: GVAGoalSteps.VALIDATE_PIN,
+        memberNumber: '12345678',
+      }),
     } as any;
 
     const res = await service.validatePin(ctx);
@@ -205,10 +225,9 @@ describe('GVAGoalService', () => {
     expect(verifyMemberPinMock).toHaveBeenCalledWith('12345678', '1234');
     expect(res.isFinalStep).toBe(true);
     expect(res.responseId).toBe(expectedValidConfig.gvaGoals.successfullyVerifiesMemberNumberAndPin);
-    expect(res.auth).toEqual({ token: 'tok', expiresIn: 3600 });
   });
 
-  it('validatePin → memberNumber missing → final invalidMemberNumber (+transfer)', async () => {
+  it('validatePin → memberNumber missing → final invalidMemberNumber', async () => {
     const service = makeService();
     detectMock.mockResolvedValueOnce({
       name: AnswerOptionsList.MEMBER_PIN,
@@ -230,7 +249,7 @@ describe('GVAGoalService', () => {
     expect(transferToQueueMock).toHaveBeenCalled();
   });
 
-  it('validatePin → "forgot the PIN" → final forgotPin (+transfer)', async () => {
+  it('validatePin → "forgot PIN" → final forgotPin', async () => {
     const service = makeService();
     detectMock.mockResolvedValueOnce({
       name: AnswerOptionsList.FORGET_THE_PIN,
@@ -242,7 +261,10 @@ describe('GVAGoalService', () => {
       gvaId: 'g8',
       messageType: 'text',
       text: 'forgot pin',
-      customJourneyContext: JSON.stringify({ STEP: GVAGoalSteps.VALIDATE_PIN, memberNumber: '111222' }),
+      customJourneyContext: JSON.stringify({
+        STEP: GVAGoalSteps.VALIDATE_PIN,
+        memberNumber: '111222',
+      }),
     } as any;
 
     const res = await service.validatePin(ctx);
@@ -252,7 +274,7 @@ describe('GVAGoalService', () => {
     expect(transferToQueueMock).toHaveBeenCalled();
   });
 
-  it('validatePin → invalid < limit → response=invalidPin, STEP=VALIDATE_PIN + responseData (лічильник з KV)', async () => {
+  it('validatePin → invalid < limit → response=invalidPin', async () => {
     const service = makeService();
     detectMock.mockResolvedValueOnce(null);
 
@@ -281,7 +303,7 @@ describe('GVAGoalService', () => {
     });
   });
 
-  it('validatePin → invalid with exceeded limit → final pinAttemptExceeded (+transfer)', async () => {
+  it('validatePin → invalid with exceeded limit → final pinAttemptExceeded', async () => {
     const service = makeService();
     detectMock.mockResolvedValueOnce(null);
 

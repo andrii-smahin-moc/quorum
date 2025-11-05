@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { LoggerInterface } from '../src/types';
 import { expectedValidConfig } from './mock-data';
 
-import { QuorumApi } from '../src/apis/quorum-api';
+import { LynktekApi } from '../src/apis/lynktek-api';
 
 const mockLogger: LoggerInterface = {
   info: vi.fn().mockResolvedValue(undefined),
@@ -26,13 +26,13 @@ vi.mock('../src/apis/data-dog-api', () => ({
   dataDogMetric: vi.fn(),
 }));
 
-describe('QuorumApi', () => {
+describe('LynktekApi', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('verifyMemberExists: calls fetchWithRetry with correct URL, headers, body and functionName', async () => {
-    const api = new QuorumApi(expectedValidConfig as any, mockLogger);
+    const api = new LynktekApi(expectedValidConfig, mockLogger);
 
     fetchWithRetrySpy.mockResolvedValueOnce({ status: true, data: { exists: true } });
 
@@ -44,14 +44,14 @@ describe('QuorumApi', () => {
     expect(fetchWithRetrySpy).toHaveBeenCalledTimes(1);
     const [url, requestOptions, functionName] = fetchWithRetrySpy.mock.calls[0];
 
-    expect(url).toBe(`${expectedValidConfig.quorumConfig.quorumApiDomain}/auth/pin`);
+    expect(url).toBe(`${expectedValidConfig.lynktekConfig.lynktekApiDomain}/auth/pin`);
     expect(functionName).toBe('verifyMemberExists');
 
     const { headers, method, body } = requestOptions as RequestInit & { body: string };
     expect(method).toBe('POST');
     expect(headers).toBeInstanceOf(Headers);
     expect((headers as Headers).get('Content-Type')).toBe('application/json');
-    expect((headers as Headers).get('X-GVA-API-Key')).toBe(expectedValidConfig.quorumConfig.quorumApiHeader);
+    expect((headers as Headers).get('X-GVA-API-Key')).toBe(expectedValidConfig.lynktekConfig.lynktekApiHeader);
 
     const parsed = JSON.parse(body);
     expect(parsed).toEqual({
@@ -65,7 +65,7 @@ describe('QuorumApi', () => {
   });
 
   it('verifyMemberPin: calls fetchWithRetry with correct URL, headers, body and functionName', async () => {
-    const api = new QuorumApi(expectedValidConfig as any, mockLogger);
+    const api = new LynktekApi(expectedValidConfig, mockLogger);
 
     fetchWithRetrySpy.mockResolvedValueOnce({ status: true, data: { pinValid: true } });
 
@@ -78,14 +78,14 @@ describe('QuorumApi', () => {
     expect(fetchWithRetrySpy).toHaveBeenCalledTimes(1);
     const [url, requestOptions, functionName] = fetchWithRetrySpy.mock.calls[0];
 
-    expect(url).toBe(`${expectedValidConfig.quorumConfig.quorumApiDomain}/auth/pin/verify`);
+    expect(url).toBe(`${expectedValidConfig.lynktekConfig.lynktekApiDomain}/auth/pin/verify`);
     expect(functionName).toBe('verifyMemberPin');
 
     const { headers, method, body } = requestOptions as RequestInit & { body: string };
     expect(method).toBe('POST');
     expect(headers).toBeInstanceOf(Headers);
     expect((headers as Headers).get('Content-Type')).toBe('application/json');
-    expect((headers as Headers).get('X-GVA-API-Key')).toBe(expectedValidConfig.quorumConfig.quorumApiHeader);
+    expect((headers as Headers).get('X-GVA-API-Key')).toBe(expectedValidConfig.lynktekConfig.lynktekApiHeader);
 
     const parsed = JSON.parse(body);
     expect(parsed).toEqual({
@@ -95,12 +95,12 @@ describe('QuorumApi', () => {
           idValue,
         },
       ],
-      pin,
+      pin: Number(pin),
     });
   });
 
   it('propagates errors from HttpRequest.fetchWithRetry', async () => {
-    const api = new QuorumApi(expectedValidConfig as any, mockLogger);
+    const api = new LynktekApi(expectedValidConfig, mockLogger);
 
     fetchWithRetrySpy.mockRejectedValueOnce(new Error('network fail'));
 

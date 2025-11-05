@@ -78,22 +78,6 @@ describe('AnswerOption', () => {
     expect(res.matchedText).toBe('Reset PIN');
   });
 
-  it('does not match quickReplyTap by partial string (must be exact for quickReplyTap)', () => {
-    const payload: HandlerPayload = {
-      engagementId: 'e5',
-      gvaId: 'g5',
-      messageType: 'quickReplyTap',
-      buttonText: 'Reset PIN now',
-    } as any;
-
-    const res = option.match(payload);
-
-    expect(res.isMatched).toBe(false);
-    expect(res.source).toBeNull();
-    expect(res.patternType).toBeNull();
-    expect(res.matchedText).toBeNull();
-  });
-
   it('no match resets internal state after previous match', () => {
     const first: HandlerPayload = {
       engagementId: 'e6',

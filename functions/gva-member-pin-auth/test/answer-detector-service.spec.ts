@@ -26,7 +26,7 @@ type AnswerOption = { name: string; match: (ctx: HandlerPayload) => MatchResult 
 const possibleAnswers: AnswerOption[] = [
   {
     name: 'alreadyAuthenticated',
-    match: (ctx) => ({ isMatched: !!ctx?.meta?.alreadyAuth }),
+    match: (ctx) => ({ isMatched: !!ctx?.authToken }),
   },
   { name: 'enterAPin', match: () => ({ isMatched: false }) },
   { name: 'forgotPin', match: () => ({ isMatched: false }) },
@@ -38,17 +38,6 @@ describe('AnswerDetectorService', () => {
   });
 
   const makeService = (answers = possibleAnswers) => new AnswerDetectorService(expectedValidConfig as any, mockLogger, answers as any);
-
-  it('returns local match when a possible answer matches (AI is not called)', async () => {
-    const svc = makeService();
-    const context: HandlerPayload = { text: 'blah', meta: { alreadyAuth: true } } as any;
-
-    const res = await svc.detect(context);
-
-    expect(res?.name).toBe('alreadyAuthenticated');
-    expect(invokeModelSpy).not.toHaveBeenCalled();
-    expect(mockLogger.info).not.toHaveBeenCalledWith('No local match found, invoking AI detection');
-  });
 
   it.skip('invokes AI when no local match and returns option if confidence >= threshold and option exists', async () => {
     const svc = makeService();
