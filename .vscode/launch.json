@@ -15,45 +15,18 @@
       "autoAttachChildProcesses": false
     },
     {
-      "name": "Debug Vitest Tests corp-cs",
+      "name": "Debug Vitest Tests",
       "type": "node",
       "request": "launch",
+      "runtimeExecutable": "/Users/master/.nvm/versions/node/v20.12.0/bin/node", // ← зміна тут
       "program": "${workspaceFolder}/functions/gva-member-pin-auth/node_modules/.bin/vitest",
-      "args": [
-        "run",
-        "config.spec.ts",
-        "--testTimeout=600000"
-      ],
+      "args": ["run", "possible-answer.spec.ts", "--testTimeout=600000"],
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
-      "skipFiles": [
-        "<node_internals>/**",
-        "node_modules/**"
-      ],
+      "skipFiles": ["<node_internals>/**", "node_modules/**"],
       "env": {
         "NODE_ENV": "test"
       }
-    },
-    // {
-    //   "name": "Debug Vitest Tests customer",
-    //   "type": "node",
-    //   "request": "launch",
-    //   "runtimeExecutable": "/Users/master/.nvm/versions/node/v20.12.0/bin/node", // ← зміна тут
-    //   "program": "${workspaceFolder}/functions/customer-service-dynamics-integration/node_modules/.bin/vitest",
-    //   "args": [
-    //     "run",
-    //     "glia-export-service.spec.ts",
-    //     "--testTimeout=600000"
-    //   ],
-    //   "console": "integratedTerminal",
-    //   "internalConsoleOptions": "neverOpen",
-    //   "skipFiles": [
-    //     "<node_internals>/**",
-    //     "node_modules/**"
-    //   ],
-    //   "env": {
-    //     "NODE_ENV": "test"
-    //   }
-    // }
+    }
   ]
 }
