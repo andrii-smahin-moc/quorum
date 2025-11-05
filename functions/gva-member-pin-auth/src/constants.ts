@@ -11,7 +11,7 @@ export const GVAGoalSteps = {
   VALIDATE_PIN: 'VALIDATE_PIN',
 };
 
-export const INITIAL_STEP = GVAGoalSteps.VALIDATE_MEMBER_NUMBER;
+export const INITIAL_STEP = 'InitialStep';
 
 export const AnswerOptionsList = {
   FORGET_THE_PIN: 'forget_the_pin',
@@ -54,7 +54,6 @@ export const AnswerSynonyms = {
     'person',
     'representative',
     'agent',
-    'human',
     'service',
     'support',
     'human',
