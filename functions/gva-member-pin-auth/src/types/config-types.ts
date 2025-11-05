@@ -31,9 +31,9 @@ export interface GVAGoals {
   transferToLiveOperator: string;
   zeroPress: string;
   pinAttemptExceeded: string;
-  otpflowstart: string;
-  invalidotpidentifier: string;
-  invalidotp: string;
+  otpFlowStart: string;
+  invalidOtpIdentifier: string;
+  invalidOtp: string;
 }
 
 export interface GliaAIConfig {
@@ -44,9 +44,9 @@ export interface GliaAIConfig {
   stopSequences: string[];
 }
 
-export interface QuorumConfig {
-  quorumApiDomain: string;
-  quorumApiHeader: string;
+export interface LynktekConfig {
+  lynktekApiDomain: string;
+  lynktekApiHeader: string;
   defaultPin: string;
   otpIdentifierType: string;
 }
@@ -60,5 +60,5 @@ export interface FunctionConfig {
   requestTimeout: number;
   retryDelay: number;
   inputValidationFailedAttemptsLimit: number;
-  quorumConfig: QuorumConfig;
+  lynktekConfig: LynktekConfig;
 }

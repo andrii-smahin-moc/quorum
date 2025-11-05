@@ -1,5 +1,5 @@
-import { GliaAuthApi, GliaEngagementApi, GliaTransferApi, QuorumApi } from '../apis';
-import { IDENTIFIER_REGEX, IdentifierTitles, INITIAL_STEP, MEMBER_PIN_REGEX, OTP_CODE_REGEX, ZERO_NUMBER } from '../constants';
+import { GliaAuthApi, GliaEngagementApi, GliaTransferApi, LynktekApi } from '../apis';
+import { AnswerOptionsList, AnswerSynonyms, GVAGoalSteps, IdentifierTitles, INITIAL_STEP } from '../constants';
 import { EngagementLegMediaTypeSchema, GliaKVValueSchema } from '../schemas';
 import { FunctionConfig, HandlerPayload, HandlerResult, IdentifierFailedAttemptsHistory, KvStoreFactory, LoggerInterface } from '../types';
 import { validateSchema } from '../validator';
@@ -9,31 +9,13 @@ import { BaseGVAGoalService } from './base-gva-goal-service';
 import { GliaKVService } from './glia-kv-service';
 import { AnswerOption } from './possible-answer';
 
-export enum GVAGoalSteps {
-  VALIDATE_MEMBER_NUMBER = 'VALIDATE_MEMBER_NUMBER',
-  VALIDATE_OTP_CODE = 'VALIDATE_OTP_CODE',
-  VALIDATE_OTP_IDENTIFIER = 'VALIDATE_OTP_IDENTIFIER',
-  VALIDATE_PIN = 'VALIDATE_PIN',
-}
-
-export const AnswerOptionsList = {
-  FORGET_THE_PIN: 'forget_the_pin',
-  MEMBER_EXIT_OPTION: 'member_exit',
-  MEMBER_NUMBER: 'member_number',
-  MEMBER_PIN: 'member_pin',
-  OTP_CODE: 'otp_code',
-  OTP_IDENTIFIER: 'otp_identifier',
-  TALK_TO_AGENT_OPTION: 'talk_to_agent',
-  ZERO_NUMBER: 'zero_number',
-};
-
 export class GVAGoalService extends BaseGVAGoalService {
   private answerDetectorService: AnswerDetectorService;
   private gliaAuthApi: GliaAuthApi;
-  private gliaEngagementApi: GliaEngagementApi | null;
+  private gliaEngagementApi: GliaEngagementApi;
   private gliaKVService: GliaKVService;
   private gliaTransferApi: GliaTransferApi;
-  private quorumApi: QuorumApi;
+  private lynktekApi: LynktekApi;
 
   constructor(
     private config: FunctionConfig,
@@ -42,7 +24,7 @@ export class GVAGoalService extends BaseGVAGoalService {
   ) {
     super();
     this.gliaAuthApi = new GliaAuthApi(config, logger);
-    this.quorumApi = new QuorumApi(config, logger);
+    this.lynktekApi = new LynktekApi(config, logger);
     this.gliaKVService = new GliaKVService(config, logger, kvStoreFactory);
     this.gliaTransferApi = new GliaTransferApi(config, logger);
     this.gliaEngagementApi = new GliaEngagementApi(config, logger);
@@ -54,47 +36,14 @@ export class GVAGoalService extends BaseGVAGoalService {
     this.register(GVAGoalSteps.VALIDATE_OTP_CODE, this.validateOtpCode.bind(this));
 
     this.answerDetectorService = new AnswerDetectorService(this.config, this.logger, [
-      new AnswerOption(AnswerOptionsList.FORGET_THE_PIN, ['I forgot', 'forgot', 'forget', 'lost', 'no', 'not', 'don']),
-      new AnswerOption(AnswerOptionsList.MEMBER_NUMBER, [IDENTIFIER_REGEX]),
-      new AnswerOption(AnswerOptionsList.MEMBER_PIN, [MEMBER_PIN_REGEX]),
-      new AnswerOption(AnswerOptionsList.ZERO_NUMBER, [ZERO_NUMBER, 'zero']),
-      new AnswerOption(AnswerOptionsList.OTP_IDENTIFIER, [IDENTIFIER_REGEX]),
-      new AnswerOption(AnswerOptionsList.OTP_CODE, [OTP_CODE_REGEX]),
-      new AnswerOption(AnswerOptionsList.TALK_TO_AGENT_OPTION, [
-        'person',
-        'representative',
-        'agent',
-        'human',
-        'service',
-        'support',
-        'human',
-        'live person',
-        'live chat',
-        'operator',
-        'technical support',
-        'tech support',
-        'customer service',
-      ]),
-      new AnswerOption(AnswerOptionsList.MEMBER_EXIT_OPTION, [
-        'exit',
-        'quit',
-        'finish',
-        'end',
-        'cancel',
-        'abort',
-        'nevermind',
-        'never mind',
-        'stop',
-        'bye',
-        'goodbye',
-        'main menu',
-        'menu',
-        'back',
-        'go back',
-        'start over',
-        'restart',
-        'begin',
-      ]),
+      new AnswerOption(AnswerOptionsList.FORGET_THE_PIN, AnswerSynonyms.FORGET_THE_PIN),
+      new AnswerOption(AnswerOptionsList.MEMBER_NUMBER, AnswerSynonyms.MEMBER_NUMBER),
+      new AnswerOption(AnswerOptionsList.MEMBER_PIN, AnswerSynonyms.MEMBER_PIN),
+      new AnswerOption(AnswerOptionsList.ZERO_NUMBER, AnswerSynonyms.ZERO_NUMBER),
+      new AnswerOption(AnswerOptionsList.OTP_IDENTIFIER, AnswerSynonyms.OTP_IDENTIFIER),
+      new AnswerOption(AnswerOptionsList.OTP_CODE, AnswerSynonyms.OTP_CODE),
+      new AnswerOption(AnswerOptionsList.TALK_TO_AGENT_OPTION, AnswerSynonyms.TALK_TO_AGENT_OPTION),
+      new AnswerOption(AnswerOptionsList.MEMBER_EXIT_OPTION, AnswerSynonyms.MEMBER_EXIT_OPTION),
     ]);
   }
 
@@ -113,14 +62,14 @@ export class GVAGoalService extends BaseGVAGoalService {
     await this.logger.info(`EngagementId: ${context.engagementId}, Validating member number`);
 
     const detectedAnswer = await this.answerDetectorService.detect(context);
-    const exitHandled = await this.handleMemberExitOption(context, detectedAnswer ?? undefined);
+    const exitHandled = await this.handleMemberExitOption(context, detectedAnswer);
     if (exitHandled) {
       return exitHandled;
     }
 
     const customJourneyContext = this.getCustomJourneyContext(context);
 
-    let memberNumberFailedAttempts = Number(customJourneyContext.memberNumberFailedAttempts ?? 0);
+    let memberNumberFailedAttempts = Number(customJourneyContext.memberNumberFailedAttempts || 0);
 
     if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.ZERO_NUMBER) {
       await this.logger.info(`EngagementId: ${context.engagementId}, Zero press detected`);
@@ -154,9 +103,9 @@ export class GVAGoalService extends BaseGVAGoalService {
         return this.buildHandlerResultPayload({
           customJourneyContext,
           responseData: {
-            identifierType: IdentifierTitles[this.config.quorumConfig.otpIdentifierType as keyof typeof IdentifierTitles],
+            identifierType: IdentifierTitles[this.config.lynktekConfig.otpIdentifierType as keyof typeof IdentifierTitles],
           },
-          responseId: this.config.gvaGoals.otpflowstart,
+          responseId: this.config.gvaGoals.otpFlowStart,
         });
       }
 
@@ -195,49 +144,47 @@ export class GVAGoalService extends BaseGVAGoalService {
     await this.logger.info(`EngagementId: ${context.engagementId}, Validating OTP code`);
 
     const detectedAnswer = await this.answerDetectorService.detect(context);
-    const exitHandled = await this.handleMemberExitOption(context, detectedAnswer ?? undefined);
+    const exitHandled = await this.handleMemberExitOption(context, detectedAnswer);
     if (exitHandled) {
       return exitHandled;
     }
 
     const customJourneyContext = this.getCustomJourneyContext(context);
 
-    const otpIdentifier = typeof customJourneyContext.otpIdentifier === 'string' ? customJourneyContext.otpIdentifier : null;
+    const otpIdentifier = this.getIdentifierFromContext(customJourneyContext);
     if (!otpIdentifier) {
       await this.logger.error(`EngagementId: ${context.engagementId}, otpIdentifier is missing before OTP code validation`);
       customJourneyContext.STEP = GVAGoalSteps.VALIDATE_OTP_IDENTIFIER;
       return this.buildHandlerResultPayload({
         customJourneyContext,
         responseData: {
-          identifierType: IdentifierTitles[this.config.quorumConfig.otpIdentifierType as keyof typeof IdentifierTitles],
+          identifierType: IdentifierTitles[this.config.lynktekConfig.otpIdentifierType as keyof typeof IdentifierTitles],
         },
-        responseId: this.config.gvaGoals.invalidotpidentifier,
+        responseId: this.config.gvaGoals.invalidOtpIdentifier,
       });
     }
 
     const attemptLimit = this.config.inputValidationFailedAttemptsLimit;
     const previousFailedAttempts = await this.getFailedIdentifierVerifyAttempts(otpIdentifier);
 
-    if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.OTP_CODE && detectedAnswer.matchedText) {
+    if (
+      detectedAnswer &&
+      (detectedAnswer.name === AnswerOptionsList.OTP_CODE || detectedAnswer.name === AnswerOptionsList.MEMBER_NUMBER) &&
+      detectedAnswer.matchedText &&
+      detectedAnswer.matchedText.length === 6
+    ) {
       const verifyResponse = await this.verifyOtpCode(otpIdentifier, detectedAnswer.matchedText);
 
-      if (
-        verifyResponse &&
-        verifyResponse.ok &&
-        typeof verifyResponse.payload.token === 'string' &&
-        String(verifyResponse.payload.expiresIn)
-      ) {
-        // await this.resetFailedAttemptsHistory(detectedAnswer.matchedText); // OTP code is one-time use, no need to reset attempts
+      if (verifyResponse && verifyResponse.ok && typeof verifyResponse.payload.token === 'string' && verifyResponse.payload.expiresIn) {
         await this.resetFailedAttemptsHistory(otpIdentifier); // reset attempts for identifier upon successful OTP verification THIS IS NEW FIXED LINE
 
-        const expiresIn =
-          Number(verifyResponse.payload.expiresIn) <= 3600 * 24 ? Date.now() + Number(verifyResponse.payload.expiresIn) * 1000 : Date.now();
+        const expiresIn = this.calculateExpiresIn(Number(verifyResponse.payload.expiresIn));
 
-        await this.gliaKVService.setValue(context.engagementId, JSON.stringify({ expiresIn, token: verifyResponse.payload.token }));
+        await this.saveToKvStore(context.engagementId, JSON.stringify({ expiresIn, token: verifyResponse.payload.token }));
 
         return this.buildHandlerResultPayload({
           auth: {
-            expiresIn: Number(verifyResponse.payload.expiresIn),
+            expiresIn,
             token: verifyResponse.payload.token,
           },
           isFinalStep: true,
@@ -267,34 +214,25 @@ export class GVAGoalService extends BaseGVAGoalService {
         otpAttemptLimit: attemptLimit,
         otpAttemptNumber: newAttempts.length,
       },
-      responseId: this.config.gvaGoals.invalidotp,
+      responseId: this.config.gvaGoals.invalidOtp,
     });
   }
 
   async validateOtpIdentifier(context: HandlerPayload): Promise<HandlerResult> {
-    await this.logger.info(`DBG[${context.engagementId}] enter VALIDATE_OTP_IDENTIFIER`);
     await this.logger.info(`EngagementId: ${context.engagementId}, Validating OTP identifier`);
 
     const detectedAnswer = await this.answerDetectorService.detect(context);
-    await this.logger.info(
-      `DBG[${context.engagementId}] detect name=${detectedAnswer?.name ?? '∅'} text="${detectedAnswer?.matchedText ?? ''}"`,
-    );
-    // this is new code below to check talk to agent option in the OTP identifier step
-    const exitHandled = await this.handleMemberExitOption(context, detectedAnswer ?? undefined);
+
+    const exitHandled = await this.handleMemberExitOption(context, detectedAnswer);
     if (exitHandled) {
       return exitHandled;
     }
-    // new code above to check talk to agent option in the OTP identifier step
     const customJourneyContext = this.getCustomJourneyContext(context);
 
-    const text = (detectedAnswer?.matchedText ?? '').trim();
-    const isIdentifier = IDENTIFIER_REGEX.test(text);
-    await this.logger.info(`DBG[${context.engagementId}] IDENTIFIER_REGEX=${isIdentifier}`);
-
-    if (isIdentifier) {
-      const failedAttempts = await this.getFailedIdentifierVerifyAttempts(text);
+    if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.OTP_IDENTIFIER && detectedAnswer.matchedText) {
+      const failedAttempts = await this.getFailedIdentifierVerifyAttempts(detectedAnswer.matchedText);
       if (failedAttempts.length >= this.config.inputValidationFailedAttemptsLimit) {
-        await this.logger.info(`EngagementId: ${context.engagementId}, OTP identifier ${text} has too many failed attempts`);
+        await this.logger.info(`EngagementId: ${context.engagementId}, OTP identifier has too many failed attempts`);
         await this.tryToTransferToQueue(context.engagementId);
         return this.buildHandlerResultPayload({
           isFinalStep: true,
@@ -302,11 +240,10 @@ export class GVAGoalService extends BaseGVAGoalService {
         });
       }
 
-      const initAuthResponse = await this.initOtpAuthentication(text);
+      const initAuthResponse = await this.initOtpAuthentication(detectedAnswer.matchedText);
       if (initAuthResponse && initAuthResponse.ok) {
-        customJourneyContext.otpIdentifier = text;
+        customJourneyContext.otpIdentifier = detectedAnswer.matchedText;
         customJourneyContext.STEP = GVAGoalSteps.VALIDATE_OTP_CODE;
-
         return this.buildHandlerResultPayload({
           customJourneyContext,
           responseId: this.config.gvaGoals.enterOTPCode,
@@ -314,7 +251,7 @@ export class GVAGoalService extends BaseGVAGoalService {
       }
     }
 
-    let identifierFailedAttempts = Number(customJourneyContext.identifierFailedAttempts ?? 0);
+    let identifierFailedAttempts = Number(customJourneyContext.identifierFailedAttempts || 0);
     const attemptLimit = this.config.inputValidationFailedAttemptsLimit;
 
     identifierFailedAttempts += 1;
@@ -336,9 +273,9 @@ export class GVAGoalService extends BaseGVAGoalService {
     return this.buildHandlerResultPayload({
       customJourneyContext,
       responseData: {
-        identifierType: IdentifierTitles[this.config.quorumConfig.otpIdentifierType as keyof typeof IdentifierTitles],
+        identifierType: IdentifierTitles[this.config.lynktekConfig.otpIdentifierType as keyof typeof IdentifierTitles],
       },
-      responseId: this.config.gvaGoals.invalidotpidentifier,
+      responseId: this.config.gvaGoals.invalidOtpIdentifier,
     });
   }
 
@@ -347,7 +284,7 @@ export class GVAGoalService extends BaseGVAGoalService {
 
     const detectedAnswer = await this.answerDetectorService.detect(context);
 
-    const exitHandled = await this.handleMemberExitOption(context, detectedAnswer ?? undefined);
+    const exitHandled = await this.handleMemberExitOption(context, detectedAnswer);
     if (exitHandled) {
       return exitHandled;
     }
@@ -375,43 +312,40 @@ export class GVAGoalService extends BaseGVAGoalService {
     }
 
     if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.MEMBER_PIN && detectedAnswer.matchedText) {
-      if (detectedAnswer.matchedText === this.config.quorumConfig.defaultPin) {
+      if (detectedAnswer.matchedText === this.config.lynktekConfig.defaultPin) {
         await this.logger.info(
-          `EngagementId: ${context.engagementId}, Default PIN matched (${this.config.quorumConfig.defaultPin}), switching to OTP flow`,
+          `EngagementId: ${context.engagementId}, Default PIN matched (${this.config.lynktekConfig.defaultPin}), switching to OTP flow`,
         );
         customJourneyContext.STEP = GVAGoalSteps.VALIDATE_OTP_IDENTIFIER;
         return this.buildHandlerResultPayload({
           customJourneyContext,
           responseData: {
-            identifierType: IdentifierTitles[this.config.quorumConfig.otpIdentifierType as keyof typeof IdentifierTitles],
+            identifierType: IdentifierTitles[this.config.lynktekConfig.otpIdentifierType as keyof typeof IdentifierTitles],
           },
-          responseId: this.config.gvaGoals.otpflowstart,
+          responseId: this.config.gvaGoals.otpFlowStart,
         });
       }
 
-      await this.logger.info(`EngagementId: ${context.engagementId}, Valid PIN received: ${detectedAnswer.matchedText}`);
+      await this.logger.info(`EngagementId: ${context.engagementId}, Valid PIN received`);
 
       const authResultResponse = await this.verifyMemberPin(memberNumber, detectedAnswer.matchedText);
       if (
         authResultResponse &&
         authResultResponse.ok &&
         typeof authResultResponse.payload.token === 'string' &&
-        String(authResultResponse.payload.expiresIn)
+        authResultResponse.payload.expiresIn
       ) {
         await this.logger.info(`EngagementId: ${context.engagementId}, PIN verified successfully`);
 
         await this.resetFailedAttemptsHistory(memberNumber);
 
-        const expiresIn =
-          Number(authResultResponse.payload.expiresIn) <= 3600 * 24
-            ? Date.now() + Number(authResultResponse.payload.expiresIn) * 1000
-            : Date.now();
+        const expiresIn = this.calculateExpiresIn(Number(authResultResponse.payload.expiresIn));
 
-        await this.gliaKVService.setValue(context.engagementId, JSON.stringify({ expiresIn, token: authResultResponse.payload.token }));
+        await this.saveToKvStore(context.engagementId, JSON.stringify({ expiresIn, token: authResultResponse.payload.token }));
 
         return this.buildHandlerResultPayload({
           auth: {
-            expiresIn: Number(authResultResponse.payload.expiresIn),
+            expiresIn,
             token: authResultResponse.payload.token,
           },
           isFinalStep: true,
@@ -459,6 +393,13 @@ export class GVAGoalService extends BaseGVAGoalService {
     });
   }
 
+  private calculateExpiresIn(expiresIn: number): number {
+    if (expiresIn <= 3600) {
+      return Date.now() + expiresIn * 1000;
+    }
+    return expiresIn;
+  }
+
   private async fetchAuthToken() {
     try {
       const authResponse = await this.gliaAuthApi.fetchUserBearerToken();
@@ -475,16 +416,6 @@ export class GVAGoalService extends BaseGVAGoalService {
 
   private async fetchEngagementDetails(token: string, engagementId: string) {
     try {
-      // Ensure gliaEngagementApi is not an error type
-      if (
-        !this.gliaEngagementApi ||
-        typeof this.gliaEngagementApi !== 'object' ||
-        this.gliaEngagementApi === null ||
-        typeof this.gliaEngagementApi.fetchEngagementDetails !== 'function'
-      ) {
-        await this.logger.error(`fetchEngagementDetails is not available on gliaEngagementApi`);
-        return null;
-      }
       const engagementDetails = await this.gliaEngagementApi.fetchEngagementDetails(token, engagementId);
       if (engagementDetails && engagementDetails.ok) {
         return engagementDetails;
@@ -556,6 +487,10 @@ export class GVAGoalService extends BaseGVAGoalService {
     return recent;
   }
 
+  private getIdentifierFromContext(customJourneyContext: Record<string, unknown>): string | null {
+    return typeof customJourneyContext.otpIdentifier === 'string' ? customJourneyContext.otpIdentifier : null;
+  }
+
   private getMemberNumberFromContext(customJourneyContext: Record<string, unknown>): string | null {
     return typeof customJourneyContext.memberNumber === 'string' ? customJourneyContext.memberNumber : null;
   }
@@ -576,9 +511,8 @@ export class GVAGoalService extends BaseGVAGoalService {
 
   private async handleMemberExitOption(
     context: HandlerPayload,
-    detectedAnswer?: { matchedText?: string | null; name?: string },
+    detectedAnswer: { matchedText?: string | null; name?: string } | null,
   ): Promise<HandlerResult | null> {
-    // this is new code below to check talk to agent option
     const isEscalation =
       !!detectedAnswer &&
       (detectedAnswer.name === AnswerOptionsList.MEMBER_EXIT_OPTION || detectedAnswer.name === AnswerOptionsList.TALK_TO_AGENT_OPTION);
@@ -594,28 +528,11 @@ export class GVAGoalService extends BaseGVAGoalService {
       isFinalStep: true,
       responseId: this.config.gvaGoals.transferToLiveOperator,
     });
-    // new code above to check talk to agent option
-    // ----------------------------------------------------------------------------------------
-    // old code below is commented to check new talk to agent option
-
-    // if (!detectedAnswer || detectedAnswer.name !== AnswerOptionsList.MEMBER_EXIT_OPTION) {
-    //   return null;
-    // }
-
-    // await this.logger.info(`EngagementId: ${context.engagementId}, Exit option detected (${detectedAnswer.matchedText ?? ''})`);
-    // await this.tryToTransferToQueue(context.engagementId);
-
-    // return this.buildHandlerResultPayload({
-    //   isFinalStep: true,
-    //   responseId: this.config.gvaGoals.transferToLiveOperator,
-    // });
-
-    // old code above is commented to check new talk to agent option
   }
 
   private async initOtpAuthentication(identifier: string) {
     try {
-      return await this.quorumApi.initOtpAuthentication(identifier);
+      return await this.lynktekApi.initOtpAuthentication(identifier);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error in setValueToKV';
       await this.logger.error(`Error initiating OTP authentication: ${message}`);
@@ -675,9 +592,9 @@ export class GVAGoalService extends BaseGVAGoalService {
 
   private async verifyIsMemberExists(memberNumber: string) {
     try {
-      return await this.quorumApi.verifyMemberExists(memberNumber);
+      return await this.lynktekApi.verifyMemberExists(memberNumber);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error in setValueToKV';
+      const message = error instanceof Error ? error.message : 'Unknown error in verifyIsMemberExists';
       await this.logger.error(`Error verifying member existence: ${message}`);
       return false;
     }
@@ -685,9 +602,9 @@ export class GVAGoalService extends BaseGVAGoalService {
 
   private async verifyMemberPin(memberNumber: string, pin: string) {
     try {
-      return await this.quorumApi.verifyMemberPin(memberNumber, pin);
+      return await this.lynktekApi.verifyMemberPin(memberNumber, pin);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error in setValueToKV';
+      const message = error instanceof Error ? error.message : 'Unknown error in verifyMemberPin';
       await this.logger.error(`Error verifying member PIN: ${message}`);
       return null;
     }
@@ -695,9 +612,9 @@ export class GVAGoalService extends BaseGVAGoalService {
 
   private async verifyOtpCode(identifier: string, code: string) {
     try {
-      return await this.quorumApi.verifyOtpCode(identifier, code);
+      return await this.lynktekApi.verifyOtpCode(identifier, code);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error in setValueToKV';
+      const message = error instanceof Error ? error.message : 'Unknown error in verifyOtpCode';
       await this.logger.error(`Error initiating OTP authentication: ${message}`);
       return null;
     }

@@ -55,9 +55,11 @@ export class AnswerOption {
     for (const pattern of this.patterns) {
       if (typeof pattern === 'string') {
         const normalizedPattern = pattern.toLowerCase();
-        const isExact = source === 'quickReplyTap' ? normalizedInput === normalizedPattern : normalizedInput.includes(normalizedPattern);
 
-        if (isExact) {
+        // eslint-disable-next-line security/detect-non-literal-regexp
+        const regex = new RegExp(`\\b${normalizedPattern}\\b`, 'i');
+        const isMatched = regex.test(normalizedInput);
+        if (isMatched) {
           return this.buildMatch(pattern, pattern, source);
         }
       } else {

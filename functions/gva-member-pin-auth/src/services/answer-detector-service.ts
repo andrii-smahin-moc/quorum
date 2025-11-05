@@ -14,7 +14,7 @@ export class AnswerDetectorService {
   }
 
   async detect(context: HandlerPayload): Promise<AnswerOption | null> {
-    const local = this.possibleAnswers.find((r) => (r.match(context).isMatched ? r : null));
+    const local = this.possibleAnswers.find((anAnswer) => (anAnswer.match(context).isMatched ? anAnswer : null));
     if (local) {
       return local;
     }

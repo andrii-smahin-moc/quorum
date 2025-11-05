@@ -53,11 +53,11 @@ export function validateConfig(environment: Record<string, unknown>): Validation
         enterOTPCode: validationResult.output.GOAL_ENTER_OTP_CODE,
         forgotPin: validationResult.output.GOAL_FORGOT_PIN,
         invalidMemberNumber: validationResult.output.GOAL_INVALID_MEMBER_NUMBER,
-        invalidotp: validationResult.output.GOAL_INVALID_OTP,
-        invalidotpidentifier: validationResult.output.GOAL_INVALID_OTP_IDENTIFIER,
+        invalidOtp: validationResult.output.GOAL_INVALID_OTP,
+        invalidOtpIdentifier: validationResult.output.GOAL_INVALID_OTP_IDENTIFIER,
         invalidPin: validationResult.output.GOAL_INVALID_PIN,
         needToAuthentication: validationResult.output.GOAL_NEED_TO_AUTHENTICATION,
-        otpflowstart: validationResult.output.GOAL_OTP_FLOW_START,
+        otpFlowStart: validationResult.output.GOAL_OTP_FLOW_START,
         pinAttemptExceeded: validationResult.output.GOAL_PIN_ATTEMPTS_EXCEEDED,
         successfullyVerifiesMemberNumberAndPin: validationResult.output.GOAL_SUCCESSFULLY_VERIFIES_MEMBER_NUMBER_AND_PIN,
         transferToLiveOperator: validationResult.output.GOAL_TRANSFER_TO_LIVE_OPERATOR,
@@ -66,11 +66,11 @@ export function validateConfig(environment: Record<string, unknown>): Validation
 
       inputValidationFailedAttemptsLimit: Number(validationResult.output.INPUT_VALIDATION_FAILED_ATTEMPTS) || 5, // changed 3 to 5
 
-      quorumConfig: {
-        defaultPin: validationResult.output.QUORUM_DEFAULT_PIN ?? '',
+      lynktekConfig: {
+        defaultPin: validationResult.output.LYNKTEK_DEFAULT_PIN ?? '',
+        lynktekApiDomain: validationResult.output.LYNKTEK_API_DOMAIN,
+        lynktekApiHeader: validationResult.output.LYNKTEK_API_HEADER,
         otpIdentifierType: validationResult.output.VALIDATE_OTP_IDENTIFIER,
-        quorumApiDomain: validationResult.output.QUORUM_API_DOMAIN,
-        quorumApiHeader: validationResult.output.QUORUM_API_HEADER,
       },
 
       requestTimeout: Number(validationResult.output.REQUEST_TIMEOUT) || 5000,

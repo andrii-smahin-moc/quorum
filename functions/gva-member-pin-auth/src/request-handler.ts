@@ -29,16 +29,13 @@ export class RequestHandler {
     }
 
     const step = typeof customJourneyContext.STEP === 'string' ? customJourneyContext.STEP : INITIAL_STEP;
-    // ✅ New logs
     await this.logger.info(`EngagementId: ${gvaPayload.output.engagementId}, GVA Step selected: ${step}`);
     try {
       const stepHandler = this.gvaGoalService.resolve(step);
       const result = await stepHandler(gvaPayload.output);
-      // ✅ log rusults before sending the responce
       await this.logger.info(
-        `EngagementId: ${gvaPayload.output.engagementId},
-        GVA Step result: responseId=${result.responseId},
-        isFinalStep=${!!result.isFinalStep}`,
+        `EngagementId: ${gvaPayload.output.engagementId}, ` +
+          `GVA Step result: responseId=${result.responseId}, isFinalStep=${String(result.isFinalStep)}`,
       );
       return {
         ...result,

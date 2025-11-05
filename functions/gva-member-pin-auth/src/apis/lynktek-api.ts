@@ -2,7 +2,7 @@ import type { FunctionConfig, HttpResponse, LoggerInterface, UnknownResponse } f
 
 import { HttpRequest } from './http-request';
 
-export class QuorumApi {
+export class LynktekApi {
   private httpRequest: HttpRequest;
 
   constructor(
@@ -15,12 +15,12 @@ export class QuorumApi {
   initOtpAuthentication(idValue: string): Promise<HttpResponse<UnknownResponse>> {
     const headers = new Headers();
     headers.append('Content-Type', 'application/json');
-    headers.append('x-gva-api-key', this.config.quorumConfig.quorumApiHeader);
+    headers.append('x-gva-api-key', this.config.lynktekConfig.lynktekApiHeader);
 
     const body = JSON.stringify({
       identifiers: [
         {
-          idType: this.config.quorumConfig.otpIdentifierType,
+          idType: this.config.lynktekConfig.otpIdentifierType,
           idValue,
         },
       ],
@@ -32,14 +32,14 @@ export class QuorumApi {
       method: 'POST',
     };
 
-    const url = `${this.config.quorumConfig.quorumApiDomain}/auth/otp`;
+    const url = `${this.config.lynktekConfig.lynktekApiDomain}/auth/otp`;
     return this.httpRequest.fetchWithRetry<UnknownResponse>(url, requestOptions, 'initOtpAuthentication');
   }
 
   verifyMemberExists(idValue: string): Promise<HttpResponse<UnknownResponse>> {
     const headers = new Headers();
     headers.append('Content-Type', 'application/json');
-    headers.append('x-gva-api-key', this.config.quorumConfig.quorumApiHeader);
+    headers.append('x-gva-api-key', this.config.lynktekConfig.lynktekApiHeader);
 
     const body = JSON.stringify({
       identifiers: [
@@ -56,14 +56,14 @@ export class QuorumApi {
       method: 'POST',
     };
 
-    const url = `${this.config.quorumConfig.quorumApiDomain}/auth/pin`;
+    const url = `${this.config.lynktekConfig.lynktekApiDomain}/auth/pin`;
     return this.httpRequest.fetchWithRetry<UnknownResponse>(url, requestOptions, 'verifyMemberExists');
   }
 
   verifyMemberPin(idValue: string, pin: string): Promise<HttpResponse<UnknownResponse>> {
     const headers = new Headers();
     headers.append('Content-Type', 'application/json');
-    headers.append('x-gva-api-key', this.config.quorumConfig.quorumApiHeader);
+    headers.append('x-gva-api-key', this.config.lynktekConfig.lynktekApiHeader);
 
     const body = JSON.stringify({
       identifiers: [
@@ -81,18 +81,18 @@ export class QuorumApi {
       method: 'POST',
     };
 
-    const url = `${this.config.quorumConfig.quorumApiDomain}/auth/pin/verify`;
+    const url = `${this.config.lynktekConfig.lynktekApiDomain}/auth/pin/verify`;
     return this.httpRequest.fetchWithRetry<UnknownResponse>(url, requestOptions, 'verifyMemberPin');
   }
   verifyOtpCode(idValue: string, otp: string): Promise<HttpResponse<UnknownResponse>> {
     const headers = new Headers();
     headers.append('Content-Type', 'application/json');
-    headers.append('x-gva-api-key', this.config.quorumConfig.quorumApiHeader);
+    headers.append('x-gva-api-key', this.config.lynktekConfig.lynktekApiHeader);
 
     const body = JSON.stringify({
       identifiers: [
         {
-          idType: this.config.quorumConfig.otpIdentifierType,
+          idType: this.config.lynktekConfig.otpIdentifierType,
           idValue,
         },
       ],
@@ -105,7 +105,7 @@ export class QuorumApi {
       method: 'POST',
     };
 
-    const url = `${this.config.quorumConfig.quorumApiDomain}/auth/otp/verify`;
+    const url = `${this.config.lynktekConfig.lynktekApiDomain}/auth/otp/verify`;
     return this.httpRequest.fetchWithRetry<UnknownResponse>(url, requestOptions, 'verifyOtpCode');
   }
 }
