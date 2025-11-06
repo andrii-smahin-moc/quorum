@@ -35,6 +35,7 @@ export function validateConfig(environment: Record<string, unknown>): Validation
         detectConfidence: Number(validationResult.output.PROMPT_DETECT_CONFIDENCE),
         detectOptionPrompt: validationResult.output.PROMPT_OPTION_DETECTOR,
         maxTokens: Number(validationResult.output.GLIA_AI_MAX_TOKENS),
+        model: validationResult.output.GLIA_AI_MODEL,
         stopSequences: (() => {
           const raw = validationResult.output.GLIA_AI_STOP_SEQUENCES;
           if (!raw) {

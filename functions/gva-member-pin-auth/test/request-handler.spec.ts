@@ -27,29 +27,16 @@ vi.mock('../src/services', () => {
 
 import { RequestHandler } from '../src/request-handler';
 import { CatalogErrors } from '../src/catalog-errors';
-import type { FunctionConfig, BaseRequestPayload, HandlerResult, HandlerPayload } from '../src/types';
+import type { BaseRequestPayload, HandlerResult, HandlerPayload, KvStoreFactory } from '../src/types';
+import { expectedValidConfig } from './mock-data';
 
-const minimalConfig = {
-  callRetries: 1,
-  requestTimeout: 1,
-  retryDelay: 1,
-  dataDog: {
-    callRetries: 1,
-    customer: 'quorum',
-    ddApiKey: '',
-    functionName: 'gva-member-pin-auth-function',
-    isDevMode: false,
-    requestTimeout: 1,
-    retryDelay: 1,
-    siteId: 'site',
-    version: '1.0.0',
-  },
-  glia: { apiDomain: '', siteId: '', userApiKey: '', userApiKeySecret: '' },
-  gliaAI: { detectConfidence: 0.5, detectOptionPrompt: 'Choose the best option:', maxTokens: 1, stopSequences: [], temperature: 0.1 },
-  gvaGoals: {} as any,
-  inputValidationFailedAttemptsLimit: 3,
-  quorumConfig: { quorumApiDomain: '', quorumApiHeader: '' },
-} as unknown as FunctionConfig;
+// Provide a KvStoreFactory mock to satisfy constructor typing
+const kvFactoryMock: KvStoreFactory = {
+  initializeKvStore: vi.fn(() => ({
+    get: vi.fn(async () => ({ value: '' })),
+    set: vi.fn(async () => {}),
+  })),
+};
 
 describe('RequestHandler.handleRequest', () => {
   beforeEach(() => {
@@ -57,12 +44,12 @@ describe('RequestHandler.handleRequest', () => {
   });
 
   it('returns error if parsePayload fails and logs it', async () => {
-    const handler = new RequestHandler(minimalConfig, loggerMock as any);
+    const handler = new RequestHandler(expectedValidConfig, loggerMock, kvFactoryMock);
 
     parsePayloadMock.mockReturnValueOnce({ status: false, message: 'bad json' });
 
     const reqPayload: BaseRequestPayload = { payload: '{"oops": "}' } as any;
-    const res = await handler.handleRequest(reqPayload);
+    const res = (await handler.handleRequest(reqPayload)) as any;
 
     expect(res.status).toBe(false);
     expect(res).toHaveProperty('error');
@@ -73,7 +60,7 @@ describe('RequestHandler.handleRequest', () => {
   });
 
   it('parses customJourneyContext, selects STEP, resolves handler, logs, and stringifies customJourneyContext in response', async () => {
-    const handler = new RequestHandler(minimalConfig, loggerMock as any);
+    const handler = new RequestHandler(expectedValidConfig, loggerMock, kvFactoryMock);
 
     const parsedPayload: HandlerPayload = {
       engagementId: 'e1',
@@ -95,7 +82,6 @@ describe('RequestHandler.handleRequest', () => {
       isFinalStep: true,
       customJourneyContext: { bar: 2 },
       customPayload: {},
-      customJourneyContext: {},
       responseData: {},
       transferToHuman: false,
     } as any;
@@ -106,7 +92,7 @@ describe('RequestHandler.handleRequest', () => {
     resolveMock.mockReturnValueOnce(stepHandler);
 
     const reqPayload: BaseRequestPayload = { payload: '{"some":"json"}' } as any;
-    const res = await handler.handleRequest(reqPayload);
+    const res = (await handler.handleRequest(reqPayload)) as any;
 
     expect(resolveMock).toHaveBeenCalledWith('verifyPin');
     expect(stepHandler).toHaveBeenCalledWith(parsedPayload);
@@ -121,7 +107,7 @@ describe('RequestHandler.handleRequest', () => {
   });
 
   it('uses INITIAL_STEP when STEP is missing/non-string', async () => {
-    const handler = new RequestHandler(minimalConfig, loggerMock as any);
+    const handler = new RequestHandler(expectedValidConfig, loggerMock, kvFactoryMock);
 
     const parsedPayload: HandlerPayload = {
       engagementId: 'e2',
@@ -148,14 +134,14 @@ describe('RequestHandler.handleRequest', () => {
     resolveMock.mockReturnValueOnce(stepHandler);
 
     const reqPayload: BaseRequestPayload = { payload: '{"x":1}' } as any;
-    const res = await handler.handleRequest(reqPayload);
+    const res = (await handler.handleRequest(reqPayload)) as any;
 
     expect(resolveMock).toHaveBeenCalledWith('INIT_STEP');
     expect(res.responseId).toBe('r-init');
   });
 
   it('returns error and logs when resolve/handler throws', async () => {
-    const handler = new RequestHandler(minimalConfig, loggerMock as any);
+    const handler = new RequestHandler(expectedValidConfig, loggerMock, kvFactoryMock);
 
     const parsedPayload: HandlerPayload = {
       engagementId: 'e3',
@@ -174,7 +160,7 @@ describe('RequestHandler.handleRequest', () => {
     resolveMock.mockReturnValueOnce(stepHandler);
 
     const reqPayload: BaseRequestPayload = { payload: '{"y":1}' } as any;
-    const res = await handler.handleRequest(reqPayload);
+    const res = (await handler.handleRequest(reqPayload)) as any;
 
     expect(res.status).toBe(false);
     expect(res).toHaveProperty('error');

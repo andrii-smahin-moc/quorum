@@ -8,8 +8,6 @@ const initOtpAuthMock = vi.fn();
 const transferToQueueMock = vi.fn().mockResolvedValue({ statusCode: 200 });
 
 vi.mock('../src/apis', async (importOriginal) => {
-  const actual = await importOriginal();
-
   const GliaAuthApi = vi.fn().mockImplementation(() => ({
     fetchUserBearerToken: vi.fn().mockResolvedValue({
       ok: true,

@@ -8,6 +8,7 @@ export const validEnv = {
   GLIA_AI_MAX_TOKENS: '256',
   GLIA_AI_STOP_SEQUENCES: 'END,STOP',
   GLIA_AI_TEMPERATURE: '0.4',
+  GLIA_AI_MODEL: 'glia.micro.v1',
   GLIA_API_DOMAIN: 'https://glia.example.com',
   GLIA_KV_STORAGE_REPOSITORY: 'kv-storage-example',
   GLIA_LIVE_OPERATOR_QUEUE: 'live-operator-queue-id',
@@ -79,6 +80,7 @@ export const expectedValidConfig: FunctionConfig = {
     maxTokens: parseInt(validEnv.GLIA_AI_MAX_TOKENS, 10),
     stopSequences: validEnv.GLIA_AI_STOP_SEQUENCES.split(',').map((s) => s.trim()),
     temperature: parseFloat(validEnv.GLIA_AI_TEMPERATURE),
+    model: validEnv.GLIA_AI_MODEL,
   },
 
   gvaGoals: {

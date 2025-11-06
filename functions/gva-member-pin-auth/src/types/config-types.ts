@@ -41,6 +41,7 @@ export interface GliaAIConfig {
   detectConfidence: number;
   temperature: number;
   maxTokens: number;
+  model: string;
   stopSequences: string[];
 }
 

@@ -6,6 +6,7 @@ export const BaseEnvironmentSchema = v.object({
   FAIL_ATTEMPTS: v.optional(v.string()),
   FDMS_VERSION: v.string(),
   GLIA_AI_MAX_TOKENS: v.string(),
+  GLIA_AI_MODEL: v.string(),
   GLIA_AI_STOP_SEQUENCES: v.string(),
   GLIA_AI_TEMPERATURE: v.string(),
   GLIA_API_DOMAIN: v.string(),
