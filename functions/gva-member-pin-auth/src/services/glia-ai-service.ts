@@ -9,11 +9,11 @@ export class GliaAIService {
     this.aiClient = aiClient.initialize(this.config.gliaAI.model);
   }
 
-  async invokeModel(text: string) {
+  async invokeModel(system: string, prompt: string) {
     const invokeConfiguration = {
       messages: [
         {
-          content: [{ text }],
+          content: [{ text: prompt }],
           role: 'user' as const,
         },
       ],
@@ -22,6 +22,11 @@ export class GliaAIService {
         stop_sequences: this.config.gliaAI.stopSequences,
         temperature: this.config.gliaAI.temperature,
       },
+      system: [
+        {
+          text: system,
+        },
+      ],
     };
 
     const resultValue = await this.aiClient.invokeModel(invokeConfiguration);

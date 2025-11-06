@@ -41,6 +41,7 @@ export const validEnv = {
 
   PROMPT_DETECT_CONFIDENCE: '0.7',
   PROMPT_OPTION_DETECTOR: 'Please choose the correct option below:',
+  SYSTEM_OPTION_DETECTOR: 'You are an assistant that helps to select options.',
 
   REQUEST_TIMEOUT: '10',
   RETRY_DELAY: '20',
@@ -81,6 +82,7 @@ export const expectedValidConfig: FunctionConfig = {
     stopSequences: validEnv.GLIA_AI_STOP_SEQUENCES.split(',').map((s) => s.trim()),
     temperature: parseFloat(validEnv.GLIA_AI_TEMPERATURE),
     model: validEnv.GLIA_AI_MODEL,
+    detectSystemMessage: validEnv.SYSTEM_OPTION_DETECTOR,
   },
 
   gvaGoals: {

@@ -33,7 +33,7 @@ export class AnswerDetectorService {
       .replace('{possibleOptions}', this.possibleAnswers.map((r) => r.name).join(', '));
 
     try {
-      const ai = await this.gliaAiService.invokeModel(prompt);
+      const ai = await this.gliaAiService.invokeModel(this.config.gliaAI.detectSystemMessage, prompt);
 
       const parsedResponse = this.safeParseAIResponse(ai);
       if (!parsedResponse) {

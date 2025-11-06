@@ -41,5 +41,6 @@ export const BaseEnvironmentSchema = v.object({
   REQUEST_TIMEOUT: v.optional(v.string()),
   RETRY_DELAY: v.optional(v.string()),
   SITE_ID: v.string(),
+  SYSTEM_OPTION_DETECTOR: v.string(),
   VALIDATE_OTP_IDENTIFIER: v.union([v.literal('SOCIAL_SECURITY_NUMBER'), v.literal('ACCOUNT_NUMBER'), v.literal('CARD_NUMBER')]),
 });

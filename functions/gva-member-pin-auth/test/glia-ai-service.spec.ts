@@ -33,7 +33,7 @@ describe('GliaAIService', () => {
     const chunks = [{ text: 'Hello' }, { text: ' ' }, { text: 'world!' }];
     invokeModelMock.mockResolvedValueOnce({ message: { content: chunks } });
 
-    const res = await service.invokeModel('some user text');
+    const res = await service.invokeModel('some system message', 'some user text');
 
     // payload check
     expect(invokeModelMock).toHaveBeenCalledTimes(1);
@@ -49,6 +49,11 @@ describe('GliaAIService', () => {
         stop_sequences: expectedValidConfig.gliaAI.stopSequences,
         temperature: expectedValidConfig.gliaAI.temperature,
       },
+      system: [
+        {
+          text: 'some system message',
+        },
+      ],
     });
 
     expect(res).toBe('Hello world!');
@@ -58,13 +63,13 @@ describe('GliaAIService', () => {
     const service = new GliaAIService(expectedValidConfig);
     invokeModelMock.mockResolvedValueOnce({});
 
-    await expect(service.invokeModel('x')).rejects.toThrow(/Glia AI response is empty:/);
+    await expect(service.invokeModel('s', 'x')).rejects.toThrow(/Glia AI response is empty:/);
   });
 
   it('invokeModel: in case of empty array content returns empty string', async () => {
     const service = new GliaAIService(expectedValidConfig);
     invokeModelMock.mockResolvedValueOnce({ message: { content: [] } });
 
-    await expect(service.invokeModel('x')).resolves.toBe('');
+    await expect(service.invokeModel('s', 'x')).resolves.toBe('');
   });
 });

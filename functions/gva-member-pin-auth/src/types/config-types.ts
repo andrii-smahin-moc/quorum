@@ -38,6 +38,7 @@ export interface GVAGoals {
 
 export interface GliaAIConfig {
   detectOptionPrompt: string;
+  detectSystemMessage: string;
   detectConfidence: number;
   temperature: number;
   maxTokens: number;
