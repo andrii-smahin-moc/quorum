@@ -175,3 +175,8 @@ function-out.js
 scripts
 
 .DS_Store
+
+glia-ai-sdk.json
+glia-kv-sdk.json
+gva-member-pin-auth.js
+/fixtures/
