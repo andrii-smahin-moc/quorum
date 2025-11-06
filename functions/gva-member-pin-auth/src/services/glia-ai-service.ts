@@ -6,7 +6,7 @@ export class GliaAIService {
   private aiClient: aiClient;
 
   constructor(private config: FunctionConfig) {
-    this.aiClient = aiClient.initialize('glia.micro.v1');
+    this.aiClient = aiClient.initialize(this.config.gliaAI.model);
   }
 
   async invokeModel(text: string) {
