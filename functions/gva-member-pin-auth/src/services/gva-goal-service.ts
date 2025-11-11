@@ -62,7 +62,7 @@ export class GVAGoalService extends BaseGVAGoalService {
     await this.logger.info(`EngagementId: ${context.engagementId}, Validating member number`);
 
     let detectedAnswer = await this.answerDetectorService.detect(context);
-    
+
     // Context-specific pattern matching for member numbers (6-12 digits)
     if (context.text) {
       const memberNumberMatch = /(?<!\d)\d{6,12}(?!\d)/.exec(context.text);
@@ -70,7 +70,7 @@ export class GVAGoalService extends BaseGVAGoalService {
         detectedAnswer = this.createContextSpecificAnswer(AnswerOptionsList.MEMBER_NUMBER, memberNumberMatch[0]);
       }
     }
-    
+
     const exitHandled = await this.handleMemberExitOption(context, detectedAnswer);
     if (exitHandled) {
       return exitHandled;
@@ -153,7 +153,7 @@ export class GVAGoalService extends BaseGVAGoalService {
     await this.logger.info(`EngagementId: ${context.engagementId}, Validating OTP code`);
 
     let detectedAnswer = await this.answerDetectorService.detect(context);
-    
+
     // Context-specific pattern matching for OTP code (exactly 6 digits)
     if (context.text) {
       const otpCodeMatch = /(?<!\d)\d{6}(?!\d)/.exec(context.text);
@@ -161,7 +161,7 @@ export class GVAGoalService extends BaseGVAGoalService {
         detectedAnswer = this.createContextSpecificAnswer(AnswerOptionsList.OTP_CODE, otpCodeMatch[0]);
       }
     }
-    
+
     const exitHandled = await this.handleMemberExitOption(context, detectedAnswer);
     if (exitHandled) {
       return exitHandled;
