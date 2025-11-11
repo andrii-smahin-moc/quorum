@@ -61,7 +61,16 @@ export class GVAGoalService extends BaseGVAGoalService {
   async validateMemberNumber(context: HandlerPayload): Promise<HandlerResult> {
     await this.logger.info(`EngagementId: ${context.engagementId}, Validating member number`);
 
-    const detectedAnswer = await this.answerDetectorService.detect(context);
+    let detectedAnswer = await this.answerDetectorService.detect(context);
+    
+    // Context-specific pattern matching for member numbers (6-12 digits)
+    if (context.text) {
+      const memberNumberMatch = /(?<!\d)\d{6,12}(?!\d)/.exec(context.text);
+      if (memberNumberMatch) {
+        detectedAnswer = this.createContextSpecificAnswer(AnswerOptionsList.MEMBER_NUMBER, memberNumberMatch[0]);
+      }
+    }
+    
     const exitHandled = await this.handleMemberExitOption(context, detectedAnswer);
     if (exitHandled) {
       return exitHandled;
@@ -143,7 +152,16 @@ export class GVAGoalService extends BaseGVAGoalService {
   async validateOtpCode(context: HandlerPayload): Promise<HandlerResult> {
     await this.logger.info(`EngagementId: ${context.engagementId}, Validating OTP code`);
 
-    const detectedAnswer = await this.answerDetectorService.detect(context);
+    let detectedAnswer = await this.answerDetectorService.detect(context);
+    
+    // Context-specific pattern matching for OTP code (exactly 6 digits)
+    if (context.text) {
+      const otpCodeMatch = /(?<!\d)\d{6}(?!\d)/.exec(context.text);
+      if (otpCodeMatch) {
+        detectedAnswer = this.createContextSpecificAnswer(AnswerOptionsList.OTP_CODE, otpCodeMatch[0]);
+      }
+    }
+    
     const exitHandled = await this.handleMemberExitOption(context, detectedAnswer);
     if (exitHandled) {
       return exitHandled;
@@ -167,12 +185,7 @@ export class GVAGoalService extends BaseGVAGoalService {
     const attemptLimit = this.config.inputValidationFailedAttemptsLimit;
     const previousFailedAttempts = await this.getFailedIdentifierVerifyAttempts(otpIdentifier);
 
-    if (
-      detectedAnswer &&
-      (detectedAnswer.name === AnswerOptionsList.OTP_CODE || detectedAnswer.name === AnswerOptionsList.MEMBER_NUMBER) &&
-      detectedAnswer.matchedText &&
-      detectedAnswer.matchedText.length === 6
-    ) {
+    if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.OTP_CODE && detectedAnswer.matchedText) {
       const verifyResponse = await this.verifyOtpCode(otpIdentifier, detectedAnswer.matchedText);
 
       if (verifyResponse && verifyResponse.ok && typeof verifyResponse.payload.token === 'string' && verifyResponse.payload.expiresIn) {
@@ -221,7 +234,15 @@ export class GVAGoalService extends BaseGVAGoalService {
   async validateOtpIdentifier(context: HandlerPayload): Promise<HandlerResult> {
     await this.logger.info(`EngagementId: ${context.engagementId}, Validating OTP identifier`);
 
-    const detectedAnswer = await this.answerDetectorService.detect(context);
+    let detectedAnswer = await this.answerDetectorService.detect(context);
+
+    // Context-specific pattern matching for OTP identifier (exactly 9 digits)
+    if (context.text) {
+      const otpIdentifierMatch = /(?<!\d)\d{9}(?!\d)/.exec(context.text);
+      if (otpIdentifierMatch) {
+        detectedAnswer = this.createContextSpecificAnswer(AnswerOptionsList.OTP_IDENTIFIER, otpIdentifierMatch[0]);
+      }
+    }
 
     const exitHandled = await this.handleMemberExitOption(context, detectedAnswer);
     if (exitHandled) {
@@ -282,7 +303,15 @@ export class GVAGoalService extends BaseGVAGoalService {
   async validatePin(context: HandlerPayload): Promise<HandlerResult> {
     await this.logger.info(`EngagementId: ${context.engagementId}, Validating PIN`);
 
-    const detectedAnswer = await this.answerDetectorService.detect(context);
+    let detectedAnswer = await this.answerDetectorService.detect(context);
+
+    // Context-specific pattern matching for PIN (exactly 4 digits)
+    if (context.text) {
+      const pinMatch = /(?<!\d)\d{4}(?!\d)/.exec(context.text);
+      if (pinMatch) {
+        detectedAnswer = this.createContextSpecificAnswer(AnswerOptionsList.MEMBER_PIN, pinMatch[0]);
+      }
+    }
 
     const exitHandled = await this.handleMemberExitOption(context, detectedAnswer);
     if (exitHandled) {
@@ -398,6 +427,14 @@ export class GVAGoalService extends BaseGVAGoalService {
       return Date.now() + expiresIn * 1000;
     }
     return expiresIn;
+  }
+
+  private createContextSpecificAnswer(name: string, matchedText: string): AnswerOption {
+    const answer = new AnswerOption(name, []);
+    answer.matchedText = matchedText;
+    answer.patternType = 'regexp';
+    answer.source = 'text';
+    return answer;
   }
 
   private async fetchAuthToken() {
