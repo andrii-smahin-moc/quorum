@@ -13,10 +13,10 @@ export class AnswerDetectorService {
     this.gliaAiService = new GliaAIService(this.config);
   }
 
-  async detect(context: HandlerPayload): Promise<AnswerOption | null> {
-    const local = this.possibleAnswers.find((anAnswer) => (anAnswer.match(context).isMatched ? anAnswer : null));
-    if (local) {
-      return local;
+  async detect(context: HandlerPayload): Promise<AnswerOption[]> {
+    const localAnswers = this.possibleAnswers.filter((anAnswer) => (anAnswer.match(context).isMatched ? anAnswer : null));
+    if (localAnswers.length > 0) {
+      return localAnswers;
     }
 
     if (context.text) {
@@ -24,10 +24,10 @@ export class AnswerDetectorService {
       return this.detectWithAI(context.text);
     }
 
-    return null;
+    return [];
   }
 
-  private async detectWithAI(text: string): Promise<AnswerOption | null> {
+  private async detectWithAI(text: string): Promise<AnswerOption[]> {
     const prompt = this.config.gliaAI.detectOptionPrompt
       .replace('{userText}', text)
       .replace('{possibleOptions}', this.possibleAnswers.map((r) => r.name).join(', '));
@@ -38,23 +38,23 @@ export class AnswerDetectorService {
       const parsedResponse = this.safeParseAIResponse(ai);
       if (!parsedResponse) {
         await this.logger.warn(`Glia AI response could not be parsed as JSON: ${ai}`);
-        return null;
+        return [];
       }
 
       await this.logger.info(`AI detected option: ${parsedResponse.option} with confidence: ${parsedResponse.confidence}`);
 
       if (parsedResponse.option && parsedResponse.confidence >= this.config.gliaAI.detectConfidence) {
-        const option = this.possibleAnswers.find((r) => r.name === parsedResponse.option);
-        if (option) {
-          return option;
+        const options = this.possibleAnswers.filter((r) => r.name === parsedResponse.option);
+        if (options.length > 0) {
+          return options;
         }
-        return null;
+        return [];
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       await this.logger.error(`Error invoking Glia AI: ${errorMessage}`);
     }
-    return null;
+    return [];
   }
 
   private safeParseAIResponse(aiResponse: string): { confidence: number; option: string | null } | null {

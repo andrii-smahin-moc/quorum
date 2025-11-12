@@ -96,7 +96,7 @@ export class LynktekApi {
           idValue,
         },
       ],
-      otp: Number(otp),
+      otp,
     });
 
     const requestOptions = {

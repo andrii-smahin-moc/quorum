@@ -61,8 +61,8 @@ export class GVAGoalService extends BaseGVAGoalService {
   async validateMemberNumber(context: HandlerPayload): Promise<HandlerResult> {
     await this.logger.info(`EngagementId: ${context.engagementId}, Validating member number`);
 
-    const detectedAnswer = await this.answerDetectorService.detect(context);
-    const exitHandled = await this.handleMemberExitOption(context, detectedAnswer);
+    const detectedAnswers = await this.answerDetectorService.detect(context);
+    const exitHandled = await this.handleMemberExitOption(context, detectedAnswers);
     if (exitHandled) {
       return exitHandled;
     }
@@ -71,7 +71,7 @@ export class GVAGoalService extends BaseGVAGoalService {
 
     let memberNumberFailedAttempts = Number(customJourneyContext.memberNumberFailedAttempts || 0);
 
-    if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.ZERO_NUMBER) {
+    if (detectedAnswers.some((anAnswer) => anAnswer.name === AnswerOptionsList.ZERO_NUMBER)) {
       await this.logger.info(`EngagementId: ${context.engagementId}, Zero press detected`);
       await this.tryToTransferToQueue(context.engagementId);
       return this.buildHandlerResultPayload({
@@ -80,14 +80,13 @@ export class GVAGoalService extends BaseGVAGoalService {
       });
     }
 
-    if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.MEMBER_NUMBER && detectedAnswer.matchedText) {
-      await this.logger.info(`EngagementId: ${context.engagementId}, Valid member number received: ${detectedAnswer.matchedText}`);
+    const detectedMemberNumberAnswer = detectedAnswers.find((anAnswer) => anAnswer.name === AnswerOptionsList.MEMBER_NUMBER);
+    if (detectedMemberNumberAnswer && detectedMemberNumberAnswer.matchedText) {
+      await this.logger.info(`EngagementId: ${context.engagementId}, Valid member number received`);
 
-      const failedAttempts = await this.getFailedIdentifierVerifyAttempts(detectedAnswer.matchedText);
+      const failedAttempts = await this.getFailedIdentifierVerifyAttempts(detectedMemberNumberAnswer.matchedText);
       if (failedAttempts.length >= this.config.inputValidationFailedAttemptsLimit) {
-        await this.logger.info(
-          `EngagementId: ${context.engagementId}, Member number ${detectedAnswer.matchedText} has too many failed attempts`,
-        );
+        await this.logger.info(`EngagementId: ${context.engagementId}, Entered Member number has too many failed attempts`);
         await this.tryToTransferToQueue(context.engagementId);
         return this.buildHandlerResultPayload({
           isFinalStep: true,
@@ -95,7 +94,7 @@ export class GVAGoalService extends BaseGVAGoalService {
         });
       }
 
-      const isMemberExistsResponse = await this.verifyIsMemberExists(detectedAnswer.matchedText);
+      const isMemberExistsResponse = await this.verifyIsMemberExists(detectedMemberNumberAnswer.matchedText);
 
       if (isMemberExistsResponse && isMemberExistsResponse.statusCode === 503) {
         customJourneyContext.STEP = GVAGoalSteps.VALIDATE_OTP_IDENTIFIER;
@@ -110,7 +109,7 @@ export class GVAGoalService extends BaseGVAGoalService {
       }
 
       if (isMemberExistsResponse && isMemberExistsResponse.ok) {
-        customJourneyContext.memberNumber = detectedAnswer.matchedText;
+        customJourneyContext.memberNumber = detectedMemberNumberAnswer.matchedText;
         customJourneyContext.STEP = GVAGoalSteps.VALIDATE_PIN;
         return this.buildHandlerResultPayload({
           customJourneyContext,
@@ -143,8 +142,8 @@ export class GVAGoalService extends BaseGVAGoalService {
   async validateOtpCode(context: HandlerPayload): Promise<HandlerResult> {
     await this.logger.info(`EngagementId: ${context.engagementId}, Validating OTP code`);
 
-    const detectedAnswer = await this.answerDetectorService.detect(context);
-    const exitHandled = await this.handleMemberExitOption(context, detectedAnswer);
+    const detectedAnswers = await this.answerDetectorService.detect(context);
+    const exitHandled = await this.handleMemberExitOption(context, detectedAnswers);
     if (exitHandled) {
       return exitHandled;
     }
@@ -167,13 +166,9 @@ export class GVAGoalService extends BaseGVAGoalService {
     const attemptLimit = this.config.inputValidationFailedAttemptsLimit;
     const previousFailedAttempts = await this.getFailedIdentifierVerifyAttempts(otpIdentifier);
 
-    if (
-      detectedAnswer &&
-      (detectedAnswer.name === AnswerOptionsList.OTP_CODE || detectedAnswer.name === AnswerOptionsList.MEMBER_NUMBER) &&
-      detectedAnswer.matchedText &&
-      detectedAnswer.matchedText.length === 6
-    ) {
-      const verifyResponse = await this.verifyOtpCode(otpIdentifier, detectedAnswer.matchedText);
+    const detectedOtpCodeAnswer = detectedAnswers.find((ans) => ans.name === AnswerOptionsList.OTP_CODE);
+    if (detectedOtpCodeAnswer && detectedOtpCodeAnswer.matchedText) {
+      const verifyResponse = await this.verifyOtpCode(otpIdentifier, detectedOtpCodeAnswer.matchedText);
 
       if (verifyResponse && verifyResponse.ok && typeof verifyResponse.payload.token === 'string' && verifyResponse.payload.expiresIn) {
         await this.resetFailedAttemptsHistory(otpIdentifier); // reset attempts for identifier upon successful OTP verification THIS IS NEW FIXED LINE
@@ -221,16 +216,16 @@ export class GVAGoalService extends BaseGVAGoalService {
   async validateOtpIdentifier(context: HandlerPayload): Promise<HandlerResult> {
     await this.logger.info(`EngagementId: ${context.engagementId}, Validating OTP identifier`);
 
-    const detectedAnswer = await this.answerDetectorService.detect(context);
+    const detectedAnswers = await this.answerDetectorService.detect(context);
 
-    const exitHandled = await this.handleMemberExitOption(context, detectedAnswer);
+    const exitHandled = await this.handleMemberExitOption(context, detectedAnswers);
     if (exitHandled) {
       return exitHandled;
     }
     const customJourneyContext = this.getCustomJourneyContext(context);
-
-    if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.OTP_IDENTIFIER && detectedAnswer.matchedText) {
-      const failedAttempts = await this.getFailedIdentifierVerifyAttempts(detectedAnswer.matchedText);
+    const detectedOtpIdentifierAnswer = detectedAnswers.find((ans) => ans.name === AnswerOptionsList.OTP_IDENTIFIER);
+    if (detectedOtpIdentifierAnswer && detectedOtpIdentifierAnswer.matchedText) {
+      const failedAttempts = await this.getFailedIdentifierVerifyAttempts(detectedOtpIdentifierAnswer.matchedText);
       if (failedAttempts.length >= this.config.inputValidationFailedAttemptsLimit) {
         await this.logger.info(`EngagementId: ${context.engagementId}, OTP identifier has too many failed attempts`);
         await this.tryToTransferToQueue(context.engagementId);
@@ -240,9 +235,9 @@ export class GVAGoalService extends BaseGVAGoalService {
         });
       }
 
-      const initAuthResponse = await this.initOtpAuthentication(detectedAnswer.matchedText);
+      const initAuthResponse = await this.initOtpAuthentication(detectedOtpIdentifierAnswer.matchedText);
       if (initAuthResponse && initAuthResponse.ok) {
-        customJourneyContext.otpIdentifier = detectedAnswer.matchedText;
+        customJourneyContext.otpIdentifier = detectedOtpIdentifierAnswer.matchedText;
         customJourneyContext.STEP = GVAGoalSteps.VALIDATE_OTP_CODE;
         return this.buildHandlerResultPayload({
           customJourneyContext,
@@ -282,15 +277,15 @@ export class GVAGoalService extends BaseGVAGoalService {
   async validatePin(context: HandlerPayload): Promise<HandlerResult> {
     await this.logger.info(`EngagementId: ${context.engagementId}, Validating PIN`);
 
-    const detectedAnswer = await this.answerDetectorService.detect(context);
+    const detectedAnswers = await this.answerDetectorService.detect(context);
 
-    const exitHandled = await this.handleMemberExitOption(context, detectedAnswer);
+    const exitHandled = await this.handleMemberExitOption(context, detectedAnswers);
     if (exitHandled) {
       return exitHandled;
     }
 
-    if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.FORGET_THE_PIN) {
-      await this.handleMemberExitOption(context, detectedAnswer);
+    if (detectedAnswers.some((answer) => answer.name === AnswerOptionsList.FORGET_THE_PIN)) {
+      await this.handleMemberExitOption(context, detectedAnswers);
       await this.logger.info(`EngagementId: ${context.engagementId}, User forgot PIN`);
       await this.tryToTransferToQueue(context.engagementId);
       return this.buildHandlerResultPayload({
@@ -311,8 +306,9 @@ export class GVAGoalService extends BaseGVAGoalService {
       });
     }
 
-    if (detectedAnswer && detectedAnswer.name === AnswerOptionsList.MEMBER_PIN && detectedAnswer.matchedText) {
-      if (detectedAnswer.matchedText === this.config.lynktekConfig.defaultPin) {
+    const detectedMemberPinAnswer = detectedAnswers.find((ans) => ans.name === AnswerOptionsList.MEMBER_PIN);
+    if (detectedMemberPinAnswer && detectedMemberPinAnswer.matchedText) {
+      if (detectedMemberPinAnswer.matchedText === this.config.lynktekConfig.defaultPin) {
         await this.logger.info(
           `EngagementId: ${context.engagementId}, Default PIN matched (${this.config.lynktekConfig.defaultPin}), switching to OTP flow`,
         );
@@ -328,7 +324,7 @@ export class GVAGoalService extends BaseGVAGoalService {
 
       await this.logger.info(`EngagementId: ${context.engagementId}, Valid PIN received`);
 
-      const authResultResponse = await this.verifyMemberPin(memberNumber, detectedAnswer.matchedText);
+      const authResultResponse = await this.verifyMemberPin(memberNumber, detectedMemberPinAnswer.matchedText);
       if (
         authResultResponse &&
         authResultResponse.ok &&
@@ -509,19 +505,16 @@ export class GVAGoalService extends BaseGVAGoalService {
     }
   }
 
-  private async handleMemberExitOption(
-    context: HandlerPayload,
-    detectedAnswer: { matchedText?: string | null; name?: string } | null,
-  ): Promise<HandlerResult | null> {
-    const isEscalation =
-      !!detectedAnswer &&
-      (detectedAnswer.name === AnswerOptionsList.MEMBER_EXIT_OPTION || detectedAnswer.name === AnswerOptionsList.TALK_TO_AGENT_OPTION);
+  private async handleMemberExitOption(context: HandlerPayload, detectedResults: AnswerOption[]): Promise<HandlerResult | null> {
+    const isEscalation = detectedResults.some(
+      (aResult) => aResult.name === AnswerOptionsList.TALK_TO_AGENT_OPTION || aResult.name === AnswerOptionsList.MEMBER_EXIT_OPTION,
+    );
 
     if (!isEscalation) {
       return null;
     }
 
-    await this.logger.info(`EngagementId: ${context.engagementId}, Escalation requested (${detectedAnswer?.matchedText ?? ''})`);
+    await this.logger.info(`EngagementId: ${context.engagementId}, Escalation requested`);
     await this.tryToTransferToQueue(context.engagementId);
 
     return this.buildHandlerResultPayload({
